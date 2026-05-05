@@ -18,6 +18,8 @@ limitations under the License.
 package impl
 
 import (
+	"fmt"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -198,6 +200,26 @@ func (p Codecov) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]
 	if err != nil {
 		taskCtx.GetLogger().Warn(err, "unable to load CodecovRepo scope for %s, branch will default to 'main'", op.FullName)
 		repo = nil
+	}
+
+	// Auto-detect the default branch from the Codecov API
+	if owner, repoName, parseErr := tasks.ParseFullName(op.FullName); parseErr == nil {
+		repoUrl := fmt.Sprintf("/api/v2/github/%s/repos/%s/", owner, repoName)
+		if res, apiErr := apiClient.Get(repoUrl, nil, nil); apiErr == nil {
+			var repoDetail struct {
+				Branch string `json:"branch"`
+			}
+			if unmarshalErr := helper.UnmarshalResponse(res, &repoDetail); unmarshalErr == nil && repoDetail.Branch != "" {
+				if repo != nil && repo.Branch != repoDetail.Branch {
+					taskCtx.GetLogger().Info("[Codecov] Default branch updated: %s -> %s for %s", repo.Branch, repoDetail.Branch, op.FullName)
+					repo.Branch = repoDetail.Branch
+					_ = db.Update(repo)
+				} else if repo != nil && repo.Branch == "" {
+					repo.Branch = repoDetail.Branch
+					_ = db.Update(repo)
+				}
+			}
+		}
 	}
 
 	return &tasks.CodecovTaskData{
