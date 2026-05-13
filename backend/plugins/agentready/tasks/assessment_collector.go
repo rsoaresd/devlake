@@ -67,6 +67,12 @@ type projectMappingRow struct {
 
 func (projectMappingRow) TableName() string { return "project_mapping" }
 
+type collectorAssessmentJSON struct {
+	Repository struct {
+		CommitHash string `json:"commit_hash"`
+	} `json:"repository"`
+}
+
 func CollectAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
@@ -131,8 +137,22 @@ func CollectAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 			taskCtx.IncProgress(1)
 			continue
 		}
+		var partial collectorAssessmentJSON
+		if jsonErr := json.Unmarshal([]byte(rawJSON), &partial); jsonErr != nil {
+			logger.Warn(nil, "Failed to parse assessment JSON for repo %s: %v", repo.DomainRepoId, jsonErr)
+			taskCtx.IncProgress(1)
+			continue
+		}
+
+		commitHash := partial.Repository.CommitHash
+		if commitHash == "" {
+			logger.Warn(nil, "Assessment for repo %s has no commit_hash, skipping", repo.DomainRepoId)
+			taskCtx.IncProgress(1)
+			continue
+		}
 
 		assessment := &models.AgentReadyAssessment{
+			Id:           fmt.Sprintf("%s:%s", repo.DomainRepoId, commitHash),
 			RepoId:       repo.DomainRepoId,
 			ConnectionId: repo.ConnectionId,
 			Provider:     repo.Provider,

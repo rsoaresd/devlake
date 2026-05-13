@@ -3,6 +3,7 @@ package tasks
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -156,4 +157,62 @@ func TestParseDomainRepoId(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollectorAssessmentId(t *testing.T) {
+	tests := []struct {
+		name    string
+		repoId  string
+		rawJSON string
+		wantId  string
+		wantErr bool
+	}{
+		{
+			name:    "valid assessment",
+			repoId:  "github:1:123",
+			rawJSON: `{"repository":{"commit_hash":"abc123"}}`,
+			wantId:  "github:1:123:abc123",
+		},
+		{
+			name:    "missing commit hash",
+			repoId:  "github:1:123",
+			rawJSON: `{"repository":{}}`,
+			wantErr: true,
+		},
+		{
+			name:    "invalid JSON",
+			repoId:  "github:1:123",
+			rawJSON: `not json`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var partial collectorAssessmentJSON
+			err := json.Unmarshal([]byte(tt.rawJSON), &partial)
+
+			if tt.wantErr {
+				if err == nil && partial.Repository.CommitHash == "" {
+					// Expected: empty commit hash is an error case
+					return
+				}
+				if err != nil {
+					return
+				}
+				t.Errorf("expected error, got none")
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected parse error: %v", err)
+			}
+
+			gotId := fmt.Sprintf("%s:%s", tt.repoId, partial.Repository.CommitHash)
+			if gotId != tt.wantId {
+				t.Errorf("got Id %q, want %q", gotId, tt.wantId)
+			}
+		})
+	}
+
 }
