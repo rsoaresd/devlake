@@ -19,6 +19,9 @@ func TestFetchGithubAssessment(t *testing.T) {
 		if r.URL.Path != "/repos/myorg/myrepo/contents/.agentready/assessment-latest.json" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
+		if ref := r.URL.Query().Get("ref"); ref != "main" {
+			t.Errorf("expected ref=main, got ref=%s", ref)
+		}
 		resp := map[string]interface{}{
 			"content":  encoded,
 			"encoding": "base64",
@@ -28,7 +31,7 @@ func TestFetchGithubAssessment(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := FetchGithubAssessment(server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "test-token")
+	result, err := FetchGithubAssessment(server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "main", "test-token")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -44,12 +47,38 @@ func TestFetchGithubAssessment_NotFound(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := FetchGithubAssessment(server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "test-token")
+	result, err := FetchGithubAssessment(server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "main", "test-token")
 	if err != nil {
 		t.Fatalf("404 should not return error, got: %v", err)
 	}
 	if result != "" {
 		t.Errorf("404 should return empty string, got %q", result)
+	}
+}
+
+func TestFetchGithubAssessment_NoBranch(t *testing.T) {
+	assessmentJSON := `{"overall_score": 50.0}`
+	encoded := base64.StdEncoding.EncodeToString([]byte(assessmentJSON))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			t.Errorf("expected no query params, got %s", r.URL.RawQuery)
+		}
+		resp := map[string]interface{}{
+			"content":  encoded,
+			"encoding": "base64",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	result, err := FetchGithubAssessment(server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "", "test-token")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != assessmentJSON {
+		t.Errorf("expected %q, got %q", assessmentJSON, result)
 	}
 }
 

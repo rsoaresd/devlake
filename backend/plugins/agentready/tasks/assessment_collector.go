@@ -108,7 +108,7 @@ func CollectAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 			if endpoint == "" {
 				endpoint = "https://api.github.com"
 			}
-			rawJSON, fetchErr = FetchGithubAssessment(endpoint, repo.FullName, filePath, repo.Token)
+			rawJSON, fetchErr = FetchGithubAssessment(endpoint, repo.FullName, filePath, branch, repo.Token)
 		case "gitlab":
 			endpoint := repo.Endpoint
 			if endpoint == "" {
@@ -251,13 +251,18 @@ func discoverRepos(db dal.Dal, options *AgentReadyOptions, logger log.Logger) ([
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
-func FetchGithubAssessment(endpoint, fullName, filePath, token string) (string, error) {
+func FetchGithubAssessment(endpoint, fullName, filePath, branch, token string) (string, error) {
 	endpoint = strings.TrimSuffix(endpoint, "/")
 	apiURL := fmt.Sprintf("%s/repos/%s/contents/%s", endpoint, fullName, filePath)
 
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating request: %w", err)
+	}
+	if branch != "" {
+		q := req.URL.Query()
+		q.Set("ref", branch)
+		req.URL.RawQuery = q.Encode()
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
