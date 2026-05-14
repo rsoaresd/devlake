@@ -36,6 +36,6 @@ const (
 	CertGold             = "Gold"
 	CertSilver           = "Silver"
 	CertBronze           = "Bronze"
-	CertNeedsImprovement = "NeedsImprovement"
+	CertNeedsImprovement = "Needs Improvement"
 	CertNone             = "None"
 )

@@ -74,7 +74,6 @@
                 "Gold": { "color": "#FFD700", "text": "Gold" },
                 "Silver": { "color": "#C0C0C0", "text": "Silver" },
                 "Bronze": { "color": "#CD7F32", "text": "Bronze" },
-                "NeedsImprovement": { "color": "#FF4444", "text": "Needs Improvement" },
                 "Needs Improvement": { "color": "#FF4444", "text": "Needs Improvement" },
                 "None": { "color": "#808080", "text": "None" }
               }

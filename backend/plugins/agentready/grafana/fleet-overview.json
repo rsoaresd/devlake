@@ -104,7 +104,7 @@
             "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#CD7F32" } }]
           },
           {
-            "matcher": { "id": "byName", "options": "NeedsImprovement" },
+            "matcher": { "id": "byName", "options": "Needs Improvement" },
             "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF4444" } }]
           },
           {
