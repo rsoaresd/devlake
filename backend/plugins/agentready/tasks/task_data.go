@@ -50,6 +50,8 @@ func ValidateTaskOptions(op *AgentReadyOptions) errors.Error {
 	return nil
 }
 
+// ParseDomainRepoId splits a domain repo ID in "provider:scopeType:connectionId:scopeId" format
+// (e.g. "github:GithubRepo:1:12345"). The scopeType segment is unused.
 func ParseDomainRepoId(repoId string) (provider string, connectionId uint64, scopeId string, err errors.Error) {
 	parts := strings.SplitN(repoId, ":", 4)
 	if len(parts) < 4 {
