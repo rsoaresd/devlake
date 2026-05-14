@@ -328,6 +328,7 @@ func FetchGithubAssessment(endpoint, fullName, filePath, branch, token string) (
 
 func fetchGitlabRawFile(endpoint string, projectId int, filePath, branch, token string) (string, error) {
 	endpoint = strings.TrimSuffix(endpoint, "/")
+	endpoint = strings.TrimSuffix(endpoint, "/api/v4")
 	encodedPath := url.PathEscape(filePath)
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%d/repository/files/%s/raw", endpoint, projectId, encodedPath)
 

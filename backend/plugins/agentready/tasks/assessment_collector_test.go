@@ -298,6 +298,46 @@ func TestFetchGitlabAssessment_DirectJSON(t *testing.T) {
 	}
 }
 
+func TestFetchGitlabAssessment_EndpointWithApiV4(t *testing.T) {
+	assessmentJSON := `{"overall_score": 90.0, "certification_level": "Platinum"}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actualPath := r.URL.RawPath
+		if actualPath == "" {
+			actualPath = r.URL.Path
+		}
+		expectedPath := "/api/v4/projects/190493/repository/files/.agentready%2Fassessment-latest.json/raw"
+		if actualPath != expectedPath {
+			t.Errorf("unexpected path: %s, expected: %s", actualPath, expectedPath)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Write([]byte(assessmentJSON))
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		name     string
+		endpoint string
+	}{
+		{"bare endpoint", server.URL},
+		{"with /api/v4", server.URL + "/api/v4"},
+		{"with /api/v4/", server.URL + "/api/v4/"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := FetchGitlabAssessment(tt.endpoint, 190493, ".agentready/assessment-latest.json", "main", "glpat-test")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != assessmentJSON {
+				t.Errorf("expected %q, got %q", assessmentJSON, result)
+			}
+		})
+	}
+}
+
 func TestLooksLikeSymlinkTarget(t *testing.T) {
 	tests := []struct {
 		name  string
