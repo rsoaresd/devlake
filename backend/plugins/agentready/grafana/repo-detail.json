@@ -82,12 +82,12 @@
     },
     {
       "title": "Assessment Metadata",
-      "type": "stat",
+      "type": "table",
       "gridPos": { "h": 4, "w": 12, "x": 12, "y": 0 },
       "datasource": "${DS_DEVLAKE}",
       "targets": [
         {
-          "rawSql": "SELECT\n  attributes_assessed AS 'Assessed',\n  attributes_total AS 'Total',\n  branch AS 'Branch',\n  ROUND(duration_seconds, 1) AS 'Duration (s)'\nFROM _tool_agentready_assessments\nWHERE repo_id = '${repo_id}' AND id != ''\nORDER BY assessed_at DESC LIMIT 1",
+          "rawSql": "SELECT\n  repo_name AS 'Repository',\n  attributes_assessed AS 'Assessed',\n  attributes_total AS 'Total',\n  branch AS 'Branch',\n  ROUND(duration_seconds, 1) AS 'Duration (s)'\nFROM _tool_agentready_assessments\nWHERE repo_id = '${repo_id}' AND id != ''\nORDER BY assessed_at DESC LIMIT 1",
           "format": "table",
           "refId": "A"
         }
@@ -195,9 +195,9 @@
         "name": "repo_id",
         "type": "query",
         "datasource": "${DS_DEVLAKE}",
-        "query": "SELECT DISTINCT repo_id FROM _tool_agentready_assessments WHERE id != ''",
+        "query": "SELECT COALESCE(repo_name, repo_id) AS __text, repo_id AS __value FROM _tool_agentready_assessments WHERE id != '' GROUP BY repo_id, repo_name ORDER BY repo_name",
         "refresh": 1,
-        "sort": 1
+        "sort": 0
       }
     ]
   },
