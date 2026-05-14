@@ -369,7 +369,7 @@ func fetchGitlabRawFile(endpoint string, projectId int, filePath, branch, token 
 // FetchGitlabAssessment fetches an assessment file via the Gitlab Repository Files API.
 // The filePath is typically a symlink (e.g. assessment-latest.json -> assessment-<timestamp>.json);
 // the Gitlab Repository Files API does not resolve symlinks automatically.
-// To resolve this, multiple hops will be made (max 5) to find the actual assessment file.
+// To resolve this, multiple hops will be made (max 2) to find the actual assessment file.
 func FetchGitlabAssessment(endpoint string, projectId int, filePath, branch, token string) (string, error) {
 	// In theory there should only be one hop from assessment-latest.json to the actual file.
 	const maxHops = 2
