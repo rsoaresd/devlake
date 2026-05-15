@@ -19,6 +19,8 @@ import (
 	"github.com/apache/incubator-devlake/plugins/agentready/models"
 )
 
+const maxAssessmentSize = 10 << 20 // 10 MB
+
 var CollectAssessmentsMeta = plugin.SubTaskMeta{
 	Name:             "collectAssessments",
 	EntryPoint:       CollectAssessments,
@@ -309,7 +311,14 @@ func FetchGithubAssessment(endpoint, fullName, filePath, branch, token string) (
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAssessmentSize+1))
+	if err != nil {
+		return "", fmt.Errorf("reading GitHub response: %w", err)
+	}
+	if len(body) > maxAssessmentSize {
+		return "", fmt.Errorf("GitHub response exceeds %d bytes limit", maxAssessmentSize)
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("decoding GitHub response: %w", err)
 	}
 
@@ -357,10 +366,13 @@ func fetchGitlabRawFile(endpoint string, projectId int, filePath, branch, token 
 		return "", fmt.Errorf("GitLab API returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	const maxAssessmentSize = 10 << 20 // 10 MB
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAssessmentSize))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAssessmentSize+1))
 	if err != nil {
 		return "", fmt.Errorf("reading GitLab response: %w", err)
+	}
+
+	if len(body) > maxAssessmentSize {
+		return "", fmt.Errorf("GitLab response exceeds %d bytes limit", maxAssessmentSize)
 	}
 
 	return string(body), nil
@@ -375,7 +387,7 @@ func FetchGitlabAssessment(endpoint string, projectId int, filePath, branch, tok
 	const maxHops = 2
 	content, err := fetchGitlabRawFile(endpoint, projectId, filePath, branch, token)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch Gitlab assessment: %w", err)
+		return "", fmt.Errorf("failed to fetch GitLab assessment: %w", err)
 	}
 	// No assessment file found.
 	if content == "" {
