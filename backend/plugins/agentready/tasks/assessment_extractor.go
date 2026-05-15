@@ -101,25 +101,28 @@ func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 	taskCtx.SetProgress(0, len(rawAssessments))
 
 	for i := range rawAssessments {
-		parsed, parseErr := ParseAssessmentJSON(&rawAssessments[i])
+		parsed, parseErr := parseRawAssessment(rawAssessments[i].RawJSON)
 		if parseErr != nil {
 			logger.Warn(nil, "Failed to parse assessment for repo %s: %v", rawAssessments[i].RepoId, parseErr)
 			taskCtx.IncProgress(1)
 			continue
 		}
-
-		dbErr := db.CreateOrUpdate(parsed)
-		if dbErr != nil {
-			logger.Warn(dbErr, "Failed to save parsed assessment %s", parsed.Id)
-		}
-
-		findings, findErr := ParseFindings(rawAssessments[i].RawJSON, parsed.Id, parsed.RepoId)
-		if findErr != nil {
-			logger.Warn(nil, "Failed to parse findings for assessment %s: %v", parsed.Id, findErr)
+		assessment, assessErr := ParseAssessmentJSON(&rawAssessments[i], parsed)
+		if assessErr != nil {
+			logger.Warn(nil, "Failed to extract assessment for repo %s: %v", rawAssessments[i].RepoId, assessErr)
 			taskCtx.IncProgress(1)
 			continue
 		}
 
+		dbErr := db.CreateOrUpdate(assessment)
+		if dbErr != nil {
+			logger.Warn(dbErr, "Failed to save parsed assessment %s", assessment.Id)
+		}
+
+		findings, findErr := ParseFindings(parsed, assessment.Id, assessment.RepoId)
+		if findErr != nil {
+			logger.Warn(nil, "Failed to parse assessment findings for repo %s: %v", assessment.RepoId, findErr)
+		}
 		for _, f := range findings {
 			dbErr = db.CreateOrUpdate(f)
 			if dbErr != nil {
@@ -133,12 +136,7 @@ func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 	return nil
 }
 
-func ParseAssessmentJSON(assessment *models.AgentReadyAssessment) (*models.AgentReadyAssessment, error) {
-	var parsed assessmentJSON
-	if err := json.Unmarshal([]byte(assessment.RawJSON), &parsed); err != nil {
-		return nil, fmt.Errorf("parsing assessment JSON: %w", err)
-	}
-
+func ParseAssessmentJSON(assessment *models.AgentReadyAssessment, parsed *assessmentJSON) (*models.AgentReadyAssessment, error) {
 	assessedAt, err := time.Parse(time.RFC3339, parsed.Timestamp)
 	if err != nil {
 		assessedAt = assessment.CollectedAt
@@ -158,12 +156,7 @@ func ParseAssessmentJSON(assessment *models.AgentReadyAssessment) (*models.Agent
 	return assessment, nil
 }
 
-func ParseFindings(rawJSON, assessmentId, repoId string) ([]*models.AgentReadyFinding, error) {
-	var parsed assessmentJSON
-	if err := json.Unmarshal([]byte(rawJSON), &parsed); err != nil {
-		return nil, fmt.Errorf("parsing findings JSON: %w", err)
-	}
-
+func ParseFindings(parsed *assessmentJSON, assessmentId, repoId string) ([]*models.AgentReadyFinding, error) {
 	var findings []*models.AgentReadyFinding
 	for _, f := range parsed.Findings {
 		if f.Status == models.FindingStatusNotApplicable {
@@ -186,15 +179,19 @@ func ParseFindings(rawJSON, assessmentId, repoId string) ([]*models.AgentReadyFi
 		}
 
 		if len(f.Evidence) > 0 {
-			evidenceJSON, _ := json.Marshal(f.Evidence)
-			finding.Evidence = string(evidenceJSON)
+			evidenceJSON, marshalErr := json.Marshal(f.Evidence)
+			if marshalErr == nil {
+				finding.Evidence = string(evidenceJSON)
+			}
 		}
 
 		if f.Remediation != nil {
 			finding.RemediationSummary = f.Remediation.Summary
 			if len(f.Remediation.Steps) > 0 {
-				stepsJSON, _ := json.Marshal(f.Remediation.Steps)
-				finding.RemediationSteps = string(stepsJSON)
+				stepsJSON, marshalErr := json.Marshal(f.Remediation.Steps)
+				if marshalErr == nil {
+					finding.RemediationSteps = string(stepsJSON)
+				}
 			}
 		}
 
@@ -202,4 +199,12 @@ func ParseFindings(rawJSON, assessmentId, repoId string) ([]*models.AgentReadyFi
 	}
 
 	return findings, nil
+}
+
+func parseRawAssessment(rawJSON string) (*assessmentJSON, error) {
+	var parsed assessmentJSON
+	if err := json.Unmarshal([]byte(rawJSON), &parsed); err != nil {
+		return nil, fmt.Errorf("parsing assessment JSON: %w", err)
+	}
+	return &parsed, nil
 }

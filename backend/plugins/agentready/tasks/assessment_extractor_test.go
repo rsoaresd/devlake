@@ -76,7 +76,11 @@ func TestParseAssessmentJSON(t *testing.T) {
 		RawJSON:      rawJSON,
 	}
 
-	result, err := ParseAssessmentJSON(assessment)
+	parsed, parseErr := parseRawAssessment(assessment.RawJSON)
+	if parseErr != nil {
+		t.Fatalf("unexpected error: %v", parseErr)
+	}
+	result, err := ParseAssessmentJSON(assessment, parsed)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,7 +141,11 @@ func TestParseFindings(t *testing.T) {
 	assessmentId := "repo1:aaa"
 	repoId := "repo1"
 
-	findings, err := ParseFindings(rawJSON, assessmentId, repoId)
+	parsed, parseErr := parseRawAssessment(rawJSON)
+	if parseErr != nil {
+		t.Fatalf("unexpected error: %v", parseErr)
+	}
+	findings, err := ParseFindings(parsed, assessmentId, repoId)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
