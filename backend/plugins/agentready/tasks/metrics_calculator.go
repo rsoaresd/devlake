@@ -79,7 +79,10 @@ func CalculateMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 
 	for _, assessment := range assessments {
 		findings := findingsByAssessment[assessment.Id]
-		metric := CalculateMetricsFromFindings(findings)
+		metric, calcErr := CalculateMetricsFromFindings(findings)
+		if calcErr != nil {
+			logger.Warn(nil, "Failed to calculate metrics for assessment %s: %v", assessment.Id, calcErr)
+		}
 		metric.Id = fmt.Sprintf("%s:%s", assessment.RepoId, assessment.AssessedAt.Format("20060102T150405"))
 		metric.RepoId = assessment.RepoId
 		metric.AssessedAt = assessment.AssessedAt
@@ -94,7 +97,7 @@ func CalculateMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 	return nil
 }
 
-func CalculateMetricsFromFindings(findings []*models.AgentReadyFinding) *models.AgentReadyMetric {
+func CalculateMetricsFromFindings(findings []*models.AgentReadyFinding) (*models.AgentReadyMetric, error) {
 	metric := &models.AgentReadyMetric{}
 
 	tierPass := map[int]int{1: 0, 2: 0, 3: 0, 4: 0}
@@ -133,11 +136,12 @@ func CalculateMetricsFromFindings(findings []*models.AgentReadyFinding) *models.
 		}
 	}
 	catJSON, marshalErr := json.Marshal(catAvg)
-	if marshalErr == nil {
-		metric.CategoryScores = string(catJSON)
+	if marshalErr != nil {
+		return metric, fmt.Errorf("marshaling category scores: %w", marshalErr)
 	}
+	metric.CategoryScores = string(catJSON)
 
-	return metric
+	return metric, nil
 }
 
 func tierPassRate(pass, total int) float64 {

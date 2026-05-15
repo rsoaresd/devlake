@@ -18,7 +18,10 @@ func TestCalculateMetricsFromFindings(t *testing.T) {
 		{Tier: 3, Status: "skipped", Score: nil, Category: "Quality", DefaultWeight: 0.3},
 	}
 
-	metric := CalculateMetricsFromFindings(findings)
+	metric, err := CalculateMetricsFromFindings(findings)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if metric.PassCount != 3 {
 		t.Errorf("PassCount = %d, want 3", metric.PassCount)
