@@ -66,7 +66,7 @@ func GetStats(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors
 
 	return &plugin.ApiResourceOutput{
 		Body: map[string]interface{}{
-			"totalRepos":                agg.Total,
+			"totalAssessments":          agg.Total,
 			"averageScore":              agg.AvgScore,
 			"certificationDistribution": certDist,
 		},
