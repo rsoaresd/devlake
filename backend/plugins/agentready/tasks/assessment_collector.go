@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -77,6 +78,7 @@ type collectorAssessmentJSON struct {
 }
 
 func CollectAssessments(taskCtx plugin.SubTaskContext) errors.Error {
+	ctx := taskCtx.GetContext()
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
 	data := taskCtx.GetData().(*AgentReadyTaskData)
@@ -117,13 +119,13 @@ func CollectAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 			if endpoint == "" {
 				endpoint = "https://api.github.com"
 			}
-			rawJSON, fetchErr = FetchGithubAssessment(endpoint, repo.FullName, filePath, branch, repo.Token)
+			rawJSON, fetchErr = FetchGithubAssessment(ctx, endpoint, repo.FullName, filePath, branch, repo.Token)
 		case "gitlab":
 			endpoint := repo.Endpoint
 			if endpoint == "" {
 				endpoint = "https://gitlab.com"
 			}
-			rawJSON, fetchErr = FetchGitlabAssessment(endpoint, repo.GitlabId, filePath, branch, repo.Token)
+			rawJSON, fetchErr = FetchGitlabAssessment(ctx, endpoint, repo.GitlabId, filePath, branch, repo.Token)
 		default:
 			logger.Warn(nil, "Unsupported provider %s for repo %s, skipping", repo.Provider, repo.DomainRepoId)
 			taskCtx.IncProgress(1)
@@ -277,11 +279,11 @@ var httpClient = &http.Client{Timeout: 30 * time.Second}
 // FetchGithubAssessment fetches an assessment file via the GitHub Contents API.
 // The filePath is typically a symlink (e.g. assessment-latest.json -> assessment-<timestamp>.json);
 // the Contents API resolves symlinks automatically and returns the target file's content.
-func FetchGithubAssessment(endpoint, fullName, filePath, branch, token string) (string, error) {
+func FetchGithubAssessment(ctx context.Context, endpoint, fullName, filePath, branch, token string) (string, error) {
 	endpoint = strings.TrimSuffix(endpoint, "/")
 	apiURL := fmt.Sprintf("%s/repos/%s/contents/%s", endpoint, fullName, filePath)
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating request: %w", err)
 	}
@@ -335,13 +337,13 @@ func FetchGithubAssessment(endpoint, fullName, filePath, branch, token string) (
 	return string(decoded), nil
 }
 
-func fetchGitlabRawFile(endpoint string, projectId int, filePath, branch, token string) (string, error) {
+func fetchGitlabRawFile(ctx context.Context, endpoint string, projectId int, filePath, branch, token string) (string, error) {
 	endpoint = strings.TrimSuffix(endpoint, "/")
 	endpoint = strings.TrimSuffix(endpoint, "/api/v4")
 	encodedPath := url.PathEscape(filePath)
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%d/repository/files/%s/raw", endpoint, projectId, encodedPath)
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating request: %w", err)
 	}
@@ -382,10 +384,10 @@ func fetchGitlabRawFile(endpoint string, projectId int, filePath, branch, token 
 // The filePath is typically a symlink (e.g. assessment-latest.json -> assessment-<timestamp>.json);
 // the Gitlab Repository Files API does not resolve symlinks automatically.
 // To resolve this, multiple hops will be made (max 2) to find the actual assessment file.
-func FetchGitlabAssessment(endpoint string, projectId int, filePath, branch, token string) (string, error) {
+func FetchGitlabAssessment(ctx context.Context, endpoint string, projectId int, filePath, branch, token string) (string, error) {
 	// In theory there should only be one hop from assessment-latest.json to the actual file.
 	const maxHops = 2
-	content, err := fetchGitlabRawFile(endpoint, projectId, filePath, branch, token)
+	content, err := fetchGitlabRawFile(ctx, endpoint, projectId, filePath, branch, token)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch GitLab assessment: %w", err)
 	}
@@ -393,7 +395,7 @@ func FetchGitlabAssessment(endpoint string, projectId int, filePath, branch, tok
 	if content == "" {
 		return "", nil
 	}
-	return resolveGitlabSymlink(endpoint, projectId, filePath, branch, token, content, maxHops)
+	return resolveGitlabSymlink(ctx, endpoint, projectId, filePath, branch, token, content, maxHops)
 }
 
 // looksLikeSymlinkTarget validates if a string looks like a symlink
@@ -435,7 +437,7 @@ func looksLikeSymlinkTarget(s string) bool {
 // resolveGitlabSymlink detects if rawContent is a symlink target path
 // and follows it to fetch the actual file. Returns the content as-is
 // if it's already valid JSON.
-func resolveGitlabSymlink(endpoint string, projectId int, originalFilePath, branch, token, rawContent string, maxHops int) (string, error) {
+func resolveGitlabSymlink(ctx context.Context, endpoint string, projectId int, originalFilePath, branch, token, rawContent string, maxHops int) (string, error) {
 	content := rawContent
 	// ".agentready/assessment-latest.json" -> ".agentready"
 	currentDir := path.Dir(originalFilePath)
@@ -465,7 +467,7 @@ func resolveGitlabSymlink(endpoint string, projectId int, originalFilePath, bran
 
 		// Fetch the resolved target
 		// Should only be one more hop
-		fetched, err := fetchGitlabRawFile(endpoint, projectId, resolvedPath, branch, token)
+		fetched, err := fetchGitlabRawFile(ctx, endpoint, projectId, resolvedPath, branch, token)
 		if err != nil {
 			return "", fmt.Errorf("following symlink %q -> %q: %w", originalFilePath, resolvedPath, err)
 		}

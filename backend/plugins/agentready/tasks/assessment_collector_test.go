@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -33,7 +34,7 @@ func TestFetchGithubAssessment(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := FetchGithubAssessment(server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "main", "test-token")
+	result, err := FetchGithubAssessment(context.Background(), server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "main", "test-token")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -49,7 +50,7 @@ func TestFetchGithubAssessment_NotFound(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := FetchGithubAssessment(server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "main", "test-token")
+	result, err := FetchGithubAssessment(context.Background(), server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "main", "test-token")
 	if err != nil {
 		t.Fatalf("404 should not return error, got: %v", err)
 	}
@@ -75,7 +76,7 @@ func TestFetchGithubAssessment_NoBranch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := FetchGithubAssessment(server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "", "test-token")
+	result, err := FetchGithubAssessment(context.Background(), server.URL, "myorg/myrepo", ".agentready/assessment-latest.json", "", "test-token")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,7 +104,7 @@ func TestFetchGitlabAssessment(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := FetchGitlabAssessment(server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
+	result, err := FetchGitlabAssessment(context.Background(), server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -118,7 +119,7 @@ func TestFetchGitlabAssessment_NotFound(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := FetchGitlabAssessment(server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
+	result, err := FetchGitlabAssessment(context.Background(), server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
 	if err != nil {
 		t.Fatalf("404 should not return error, got: %v", err)
 	}
@@ -242,7 +243,7 @@ func TestFetchGitlabAssessment_SymlinkResolution(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := FetchGitlabAssessment(server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
+	result, err := FetchGitlabAssessment(context.Background(), server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -259,7 +260,7 @@ func TestGitlabAssessment_TooManyHops(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := FetchGitlabAssessment(server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
+	_, err := FetchGitlabAssessment(context.Background(), server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
 
 	// Error is expected, success would mean the infinite loop isn't caught.
 	if err == nil {
@@ -283,7 +284,7 @@ func TestFetchGitlabAssessment_DirectJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	result, err := FetchGitlabAssessment(server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
+	result, err := FetchGitlabAssessment(context.Background(), server.URL, 42, ".agentready/assessment-latest.json", "main", "glpat-test")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -327,7 +328,7 @@ func TestFetchGitlabAssessment_EndpointWithApiV4(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := FetchGitlabAssessment(tt.endpoint, 190493, ".agentready/assessment-latest.json", "main", "glpat-test")
+			result, err := FetchGitlabAssessment(context.Background(), tt.endpoint, 190493, ".agentready/assessment-latest.json", "main", "glpat-test")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
