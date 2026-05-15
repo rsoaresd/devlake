@@ -7,6 +7,7 @@ import (
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/agentready/models"
 )
@@ -65,16 +66,38 @@ func ExtractAssessments(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
 
+	data := taskCtx.GetData().(*AgentReadyTaskData)
+	repos, err := discoverRepos(db, data.Options, logger)
+	if err != nil {
+		return errors.Default.Wrap(err, "failed to discover repos for extraction")
+	}
+	if len(repos) == 0 {
+		logger.Info("No repos found for extraction, skipping")
+		return nil
+	}
+	repoIds := make([]string, 0, len(repos))
+	for _, r := range repos {
+		repoIds = append(repoIds, r.DomainRepoId)
+	}
+
 	var rawAssessments []models.AgentReadyAssessment
-	err := db.All(&rawAssessments,
+	clauses := []dal.Clause{
 		dal.From(&models.AgentReadyAssessment{}),
-		dal.Where("raw_json != ''"),
-	)
+		dal.Where("raw_json != '' AND repo_id IN (?)", repoIds),
+	}
+	if data.Options.TimeAfter != "" {
+		timeAfter, parseErr := common.ConvertStringToTime(data.Options.TimeAfter)
+		if parseErr != nil {
+			return errors.BadInput.Wrap(parseErr, "invalid timeAfter format")
+		}
+		clauses = append(clauses, dal.Where("collected_at >= ?", timeAfter))
+	}
+	err = db.All(&rawAssessments, clauses...)
 	if err != nil {
 		return errors.Default.Wrap(err, "failed to query raw assessments")
 	}
 
-	logger.Info("Extracting %d assessments", len(rawAssessments))
+	logger.Info("Extracting %d assessments for %d repos", len(rawAssessments), len(repoIds))
 	taskCtx.SetProgress(0, len(rawAssessments))
 
 	for i := range rawAssessments {
