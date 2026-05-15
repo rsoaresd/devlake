@@ -23,30 +23,62 @@ func CalculateMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
 
+	data := taskCtx.GetData().(*AgentReadyTaskData)
+	repos, err := discoverRepos(db, data.Options, logger)
+	if err != nil {
+		return errors.Default.Wrap(err, "failed to discover repos for metrics calculation")
+	}
+	if len(repos) == 0 {
+		logger.Info("No repos found for metrics calculation, skipping")
+		return nil
+	}
+	repoIds := make([]string, 0, len(repos))
+	for _, r := range repos {
+		repoIds = append(repoIds, r.DomainRepoId)
+	}
 	var assessments []models.AgentReadyAssessment
-	err := db.All(&assessments,
+	clauses := []dal.Clause{
 		dal.From(&models.AgentReadyAssessment{}),
-		dal.Where("id != ''"),
-	)
+		dal.Where("repo_id IN (?)", repoIds),
+	}
+
+	err = db.All(&assessments, clauses...)
 	if err != nil {
 		return errors.Default.Wrap(err, "failed to query assessments")
+	}
+
+	if len(assessments) == 0 {
+		logger.Info("No assessments found, skipping metrics")
+		return nil
 	}
 
 	logger.Info("Calculating metrics for %d assessments", len(assessments))
 	taskCtx.SetProgress(0, len(assessments))
 
-	for _, assessment := range assessments {
-		var findings []*models.AgentReadyFinding
-		err := db.All(&findings,
-			dal.From(&models.AgentReadyFinding{}),
-			dal.Where("assessment_id = ?", assessment.Id),
-		)
-		if err != nil {
-			logger.Warn(err, "Failed to query findings for assessment %s", assessment.Id)
-			taskCtx.IncProgress(1)
-			continue
-		}
+	var allFindings []*models.AgentReadyFinding
+	assessmentIds := make([]string, 0, len(assessments))
+	for _, a := range assessments {
+		assessmentIds = append(assessmentIds, a.Id)
+	}
+	err = db.All(&allFindings,
+		dal.From(&models.AgentReadyFinding{}),
+		dal.Where("assessment_id IN (?)", assessmentIds),
+	)
 
+	if err != nil {
+		return errors.Default.Wrap(err, "failed to query findings")
+	}
+
+	findingsByAssessment := map[string][]*models.AgentReadyFinding{}
+
+	for _, f := range allFindings {
+		findingsByAssessment[f.AssessmentId] = append(
+			findingsByAssessment[f.AssessmentId], f,
+		)
+	}
+
+	for _, assessment := range assessments {
+		findings := findingsByAssessment[assessment.Id]
 		metric := CalculateMetricsFromFindings(findings)
 		metric.Id = fmt.Sprintf("%s:%s", assessment.RepoId, assessment.AssessedAt.Format("20060102T150405"))
 		metric.RepoId = assessment.RepoId
