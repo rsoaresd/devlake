@@ -132,8 +132,10 @@ func CalculateMetricsFromFindings(findings []*models.AgentReadyFinding) *models.
 			catAvg[cat] = sum / float64(catCount[cat])
 		}
 	}
-	catJSON, _ := json.Marshal(catAvg)
-	metric.CategoryScores = string(catJSON)
+	catJSON, marshalErr := json.Marshal(catAvg)
+	if marshalErr == nil {
+		metric.CategoryScores = string(catJSON)
+	}
 
 	return metric
 }
