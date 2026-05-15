@@ -43,7 +43,10 @@ func CreateScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutpu
 }
 
 func GetScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	id, _ := strconv.ParseUint(input.Params["id"], 10, 64)
+	id, parseErr := strconv.ParseUint(input.Params["id"], 10, 64)
+	if parseErr != nil {
+		return nil, errors.BadInput.Wrap(parseErr, "invalid scope config id")
+	}
 	var config models.AgentReadyScopeConfig
 	err := db.First(&config, dal.Where("id = ?", id))
 	if err != nil {
@@ -56,7 +59,10 @@ func GetScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 }
 
 func UpdateScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	id, _ := strconv.ParseUint(input.Params["id"], 10, 64)
+	id, parseErr := strconv.ParseUint(input.Params["id"], 10, 64)
+	if parseErr != nil {
+		return nil, errors.BadInput.Wrap(parseErr, "invalid scope config id")
+	}
 	var config models.AgentReadyScopeConfig
 	err := db.First(&config, dal.Where("id = ?", id))
 	if err != nil {
@@ -77,7 +83,10 @@ func UpdateScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutpu
 }
 
 func DeleteScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	id, _ := strconv.ParseUint(input.Params["id"], 10, 64)
+	id, parseErr := strconv.ParseUint(input.Params["id"], 10, 64)
+	if parseErr != nil {
+		return nil, errors.BadInput.Wrap(parseErr, "invalid scope config id")
+	}
 	err := db.Delete(&models.AgentReadyScopeConfig{}, dal.Where("id = ?", id))
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "failed to delete scope config")
