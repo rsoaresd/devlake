@@ -83,7 +83,7 @@ func CalculateMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 		if calcErr != nil {
 			logger.Warn(nil, "Failed to calculate metrics for assessment %s: %v", assessment.Id, calcErr)
 		}
-		metric.Id = fmt.Sprintf("%s:%s", assessment.RepoId, assessment.AssessedAt.Format("20060102T150405"))
+		metric.Id = fmt.Sprintf("%s:%s:%s", assessment.RepoId, assessment.AssessedAt.Format("20060102T150405"), assessment.Id)
 		metric.RepoId = assessment.RepoId
 		metric.AssessedAt = assessment.AssessedAt
 
