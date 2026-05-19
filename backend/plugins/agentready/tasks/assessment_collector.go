@@ -457,8 +457,8 @@ func resolveGitlabSymlink(ctx context.Context, endpoint string, projectId int, o
 		}
 
 		// Resolve relative to current directory:
-		// path.Join(".agentready", "assessment-20260512.json")
-		// new path -> ".agentready/assessment-20260512.json"
+		// path.Join(".agentready", "assessment-20260512-102957.json")
+		// new path -> ".agentready/assessment-20260512-102957.json"
 		// path.Clean handles "../" normalization
 		resolvedPath := path.Clean(path.Join(currentDir, trimmed))
 

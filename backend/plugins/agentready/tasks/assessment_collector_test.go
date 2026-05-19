@@ -346,9 +346,9 @@ func TestLooksLikeSymlinkTarget(t *testing.T) {
 		want  bool
 	}{
 		// Should match, these look like symlink targets
-		{"simple filename", "assessment-20260512.json", true},
-		{"with directory", "subdir/assessment-20260512.json", true},
-		{"relative path", "../assessment-20260512.json", true},
+		{"simple filename", "assessment-20260512-102957.json", true},
+		{"with directory", "subdir/assessment-20260512-102957.json", true},
+		{"relative path", "../assessment-20260512-102957.json", true},
 
 		// Should NOT match, these are something else
 		{"empty string", "", false},
@@ -358,8 +358,8 @@ func TestLooksLikeSymlinkTarget(t *testing.T) {
 		{"has carriage return", "file.json\r", false},
 		{"has null byte", "file\x00.json", false},
 		{"too long", strings.Repeat("a", 501) + ".json", false},
-		{"wrong extension", "assessment-20260512.yaml", false},
-		{"no extension", "assessment-20260512", false},
+		{"wrong extension", "assessment-20260512-102957.yaml", false},
+		{"no extension", "assessment-20260512-102957", false},
 	}
 
 	for _, tt := range tests {
