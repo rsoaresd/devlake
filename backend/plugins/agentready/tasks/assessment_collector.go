@@ -292,7 +292,11 @@ func FetchGithubAssessment(ctx context.Context, endpoint, fullName, filePath, br
 		q.Set("ref", branch)
 		req.URL.RawQuery = q.Encode()
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	if token == "" {
+		return "", fmt.Errorf("A Github token required to make requests")
+	} else {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	resp, err := httpClient.Do(req)
@@ -352,7 +356,11 @@ func fetchGitlabRawFile(ctx context.Context, endpoint string, projectId int, fil
 		q.Set("ref", branch)
 		req.URL.RawQuery = q.Encode()
 	}
-	req.Header.Set("Private-Token", token)
+	if token == "" {
+		return "", fmt.Errorf("A Gitlab token is required to make requests")
+	} else {
+		req.Header.Set("Private-Token", token)
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {

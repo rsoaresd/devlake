@@ -85,6 +85,24 @@ func TestFetchGithubAssessment_NoBranch(t *testing.T) {
 	}
 }
 
+func TestFetchGithubAssessment_EmptyToken(t *testing.T) {
+	var requestMade bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestMade = true
+	}))
+	defer server.Close()
+
+	_, err := FetchGithubAssessment(context.Background(), server.URL, "org/repo", "file.json", "main", "")
+
+	if requestMade == true {
+		t.Fatalf("expected no requests to be made by server")
+	}
+
+	if err == nil {
+		t.Fatal("expected error for empty token")
+	}
+}
+
 func TestFetchGitlabAssessment(t *testing.T) {
 	assessmentJSON := `{"overall_score": 72.0, "certification_level": "Silver"}`
 
@@ -125,6 +143,24 @@ func TestFetchGitlabAssessment_NotFound(t *testing.T) {
 	}
 	if result != "" {
 		t.Errorf("404 should return empty string, got %q", result)
+	}
+}
+
+func TestFetchGitlabAssessment_EmptyToken(t *testing.T) {
+	var requestMade bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestMade = true
+	}))
+	defer server.Close()
+
+	_, err := FetchGitlabAssessment(context.Background(), server.URL, 1337, "file.json", "main", "")
+
+	if requestMade == true {
+		t.Fatalf("expected no requests to be made by server")
+	}
+
+	if err == nil {
+		t.Fatal("expected error for empty token")
 	}
 }
 
