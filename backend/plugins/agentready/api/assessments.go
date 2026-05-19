@@ -24,8 +24,11 @@ func GetAssessments(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 	var clauses []dal.Clause
 
 	if projectName := input.Query.Get("projectName"); projectName != "" {
+		// DISTINCT guards against duplicate rows from the project_mapping join.
+		// PK (project_name, table, row_id) prevents true duplicates for a single
+		// project, so db.Count (which drops DISTINCT) still returns correct totals.
 		clauses = []dal.Clause{
-			dal.Select("a.*"),
+			dal.Select("DISTINCT a.*"),
 			dal.From("_tool_agentready_assessments a"),
 			dal.Join("JOIN project_mapping pm ON a.repo_id = pm.row_id"),
 			dal.Where("pm.project_name = ? AND pm.`table` = ?", projectName, "repos"),
