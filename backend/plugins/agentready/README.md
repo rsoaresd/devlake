@@ -121,7 +121,7 @@ Aggregated metrics computed per assessment:
 - Per-tier pass rates (Tier 1 through Tier 4) as percentages
 - Category scores (JSON map of category to average score)
 
-Primary key format: `{repoId}:{timestamp}`
+Primary key format: `{repoId}:{timestamp}:{assessmentId}`
 
 ## Subtasks
 
