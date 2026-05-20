@@ -174,3 +174,6 @@ __debug_bin*
 # Sensitive files
 cookies.txt
 custom-ca.crt
+
+# agentready assessment reports
+.agentready/

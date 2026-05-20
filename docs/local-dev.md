@@ -1,6 +1,6 @@
-# DevLake Local Development (AI Reference)
+# DevLake Local Development
 
-Quick reference for AI agents working on this project.
+Quick reference for local development on this project.
 
 ## Environment
 
@@ -131,10 +131,3 @@ podman compose -f docker-compose-dev.yml exec mysql mysql -uroot -padmin -e "
   FLUSH PRIVILEGES;
 "
 ```
-
-## Project Conventions
-
-- Plugin code: `backend/plugins/<plugin-name>/`
-- Tests next to source: `foo.go` → `foo_test.go`
-- E2E test fixtures: `e2e/raw_tables/*.csv`
-- Migrations: `models/migrationscripts/`
