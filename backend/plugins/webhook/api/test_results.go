@@ -163,7 +163,8 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 	}
 
 	if dbErr := db.CreateOrUpdate(ciJob); dbErr != nil {
-		return nil, errors.Default.Wrap(dbErr, "failed to save CI job")
+		err = errors.Default.Wrap(dbErr, "failed to save CI job")
+		return nil, err
 	}
 
 	savedSuites := 0
@@ -171,15 +172,17 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 
 	// Parse JUnit XML files from multipart uploads
 	for _, fileHeader := range junitFiles {
-		f, err := fileHeader.Open()
-		if err != nil {
-			return nil, errors.Default.Wrap(err, fmt.Sprintf("failed to open uploaded file %s", fileHeader.Filename))
+		f, openErr := fileHeader.Open()
+		if openErr != nil {
+			err = errors.Default.Wrap(openErr, fmt.Sprintf("failed to open uploaded file %s", fileHeader.Filename))
+			return nil, err
 		}
 
-		xmlContent, err := io.ReadAll(io.LimitReader(f, 10*1024*1024))
+		xmlContent, readErr := io.ReadAll(io.LimitReader(f, 10*1024*1024))
 		f.Close()
-		if err != nil {
-			return nil, errors.Default.Wrap(err, fmt.Sprintf("failed to read uploaded file %s", fileHeader.Filename))
+		if readErr != nil {
+			err = errors.Default.Wrap(readErr, fmt.Sprintf("failed to read uploaded file %s", fileHeader.Filename))
+			return nil, err
 		}
 
 		// Parse XML — try <testsuites> first, then bare <testsuite>
@@ -213,7 +216,8 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 			}
 
 			if dbErr := db.CreateOrUpdate(testSuite); dbErr != nil {
-				return nil, errors.Default.Wrap(dbErr, fmt.Sprintf("failed to save test suite %s", suite.Name))
+				err = errors.Default.Wrap(dbErr, fmt.Sprintf("failed to save test suite %s", suite.Name))
+				return nil, err
 			}
 			savedSuites++
 
@@ -253,7 +257,8 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 				}
 
 				if dbErr := db.CreateOrUpdate(testCase); dbErr != nil {
-					return nil, errors.Default.Wrap(dbErr, fmt.Sprintf("failed to save test case %s", tc.Name))
+					err = errors.Default.Wrap(dbErr, fmt.Sprintf("failed to save test case %s", tc.Name))
+					return nil, err
 				}
 				savedCases++
 			}
@@ -273,7 +278,13 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 
 // generateWebhookUID creates a random 16-char hex string for unique IDs.
 func generateWebhookUID() string {
+	return generateWebhookUIDFrom(rand.Reader)
+}
+
+func generateWebhookUIDFrom(r io.Reader) string {
 	b := make([]byte, 8)
-	_, _ = rand.Read(b)
+	if _, err := r.Read(b); err != nil {
+		panic("crypto/rand.Read failed: " + err.Error())
+	}
 	return hex.EncodeToString(b)
 }
