@@ -186,6 +186,9 @@ func convertOrphanedRepoAccounts(taskCtx plugin.SubTaskContext, db dal.Dal, data
 			return err
 		}
 	}
+	if err := cursor.Err(); err != nil {
+		return errors.Default.Wrap(err, "iterating repo accounts cursor")
+	}
 
 	return nil
 }
