@@ -81,7 +81,10 @@ func GetAssessment(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, e
 	var assessment models.AgentReadyAssessment
 	err := db.First(&assessment, dal.Where("id = ?", id))
 	if err != nil {
-		return nil, errors.Default.Wrap(err, "assessment not found")
+		if db.IsErrorNotFound(err) {
+			return nil, errors.HttpStatus(http.StatusNotFound).Wrap(err, "assessment not found")
+		}
+		return nil, errors.Default.Wrap(err, "failed to get assessment")
 	}
 
 	var findings []models.AgentReadyFinding

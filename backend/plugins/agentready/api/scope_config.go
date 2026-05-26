@@ -50,7 +50,10 @@ func GetScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 	var config models.AgentReadyScopeConfig
 	err := db.First(&config, dal.Where("id = ?", id))
 	if err != nil {
-		return nil, errors.Default.Wrap(err, "scope config not found")
+		if db.IsErrorNotFound(err) {
+			return nil, errors.HttpStatus(http.StatusNotFound).Wrap(err, "scope config not found")
+		}
+		return nil, errors.Default.Wrap(err, "failed to get scope config")
 	}
 	return &plugin.ApiResourceOutput{
 		Body:   config,
@@ -66,7 +69,10 @@ func UpdateScopeConfig(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutpu
 	var config models.AgentReadyScopeConfig
 	err := db.First(&config, dal.Where("id = ?", id))
 	if err != nil {
-		return nil, errors.Default.Wrap(err, "scope config not found")
+		if db.IsErrorNotFound(err) {
+			return nil, errors.HttpStatus(http.StatusNotFound).Wrap(err, "scope config not found")
+		}
+		return nil, errors.Default.Wrap(err, "failed to get scope config")
 	}
 	decodeErr := helper.Decode(input.Body, &config, nil)
 	if decodeErr != nil {
