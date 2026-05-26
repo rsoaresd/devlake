@@ -458,15 +458,13 @@ func makeProjectOutput(project *models.Project, withLastPipeline bool) (*models.
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "failed to load project metrics")
 	}
-	// convert metric to api output
-	if len(projectMetrics) > 0 {
-		baseMetrics := make([]*models.BaseMetric, len(projectMetrics))
-		for i, projectMetric := range projectMetrics {
-			baseMetric := projectMetric.BaseMetric
-			baseMetrics[i] = &baseMetric
-		}
-		projectOutput.Metrics = baseMetrics
+	// convert metric to api output — always assign so JSON serializes as [] not null
+	baseMetrics := make([]*models.BaseMetric, 0, len(projectMetrics))
+	for _, projectMetric := range projectMetrics {
+		baseMetric := projectMetric.BaseMetric
+		baseMetrics = append(baseMetrics, &baseMetric)
 	}
+	projectOutput.Metrics = baseMetrics
 
 	// load blueprint
 	projectOutput.Blueprint, err = GetBlueprintByProjectName(projectOutput.Name)
