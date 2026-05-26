@@ -81,7 +81,7 @@ func (agentReadyMetric20260511) TableName() string {
 }
 
 type agentReadyScopeConfig20260511 struct {
-	common.ScopeConfig
+	common.ScopeConfig `gorm:"embedded"`
 	Branch             string `gorm:"type:varchar(255)"`
 	AssessmentFilePath string `gorm:"type:varchar(500)"`
 	ExcludeRepos       string `gorm:"type:text"`
