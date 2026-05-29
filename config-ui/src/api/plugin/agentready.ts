@@ -18,21 +18,19 @@
 
 import { request } from '@/utils';
 
-import * as agentready from './agentready';
-import * as aireview from './aireview';
-import * as jira from './jira';
-import * as tapd from './tapd';
-import * as webhook from './webhook';
+export interface IAgentReadyScopeConfig {
+  id?: number;
+  name?: string;
+  branch: string;
+  assessmentFilePath: string;
+  excludeRepos: string;
+}
 
-export const list = (): Promise<[{ plugin: string }]> => request('/plugins');
+export const getScopeConfig = (id: number): Promise<IAgentReadyScopeConfig> =>
+  request(`/plugins/agentready/scope-configs/${id}`);
 
-export const plugin = {
-  list,
-  agentready,
-  aireview,
-  jira,
-  tapd,
-  webhook,
-};
+export const createScopeConfig = (data: Partial<IAgentReadyScopeConfig>): Promise<IAgentReadyScopeConfig> =>
+  request('/plugins/agentready/scope-configs', { method: 'post', data });
 
-export default plugin;
+export const updateScopeConfig = (id: number, data: Partial<IAgentReadyScopeConfig>): Promise<IAgentReadyScopeConfig> =>
+  request(`/plugins/agentready/scope-configs/${id}`, { method: 'patch', data });
