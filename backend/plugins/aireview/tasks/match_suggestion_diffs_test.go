@@ -18,12 +18,16 @@ limitations under the License.
 package tasks
 
 import (
-	"math"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/apache/incubator-devlake/core/errors"
+	mockdal "github.com/apache/incubator-devlake/mocks/core/dal"
 	"github.com/apache/incubator-devlake/plugins/aireview/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestIsApplySuggestionCommit(t *testing.T) {
@@ -253,10 +257,6 @@ func TestIsTrivialLine(t *testing.T) {
 	}
 }
 
-func almostEqual(a, b, epsilon float64) bool {
-	return math.Abs(a-b) < epsilon
-}
-
 func TestMatchFinding(t *testing.T) {
 	baseTime := time.Date(2026, 3, 15, 10, 0, 0, 0, time.UTC)
 
@@ -463,4 +463,151 @@ func TestParseFilesJSON(t *testing.T) {
 	if !strings.Contains(files[0].Patch, "\n") {
 		t.Errorf("files[0].Patch should contain real newlines, got: %q", files[0].Patch)
 	}
+}
+
+func TestLoadSuggestionFindings(t *testing.T) {
+	t.Run("success with one row", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockRows := new(mockdal.Rows)
+
+		mockDal.On("Cursor", mock.Anything).Return(mockRows, nil)
+		mockRows.On("Next").Return(true).Once()
+		mockRows.On("Next").Return(false).Once()
+		mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
+			dst := args.Get(1).(*suggestionFinding)
+			dst.AiReviewFinding = models.AiReviewFinding{
+				Id:       "finding-1",
+				FilePath: "pkg/server.go",
+				RepoId:   "repo-1",
+				Type:     models.FindingTypeSuggestion,
+			}
+			dst.ReviewCreatedDate = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+			dst.AiToolUser = "coderabbitai[bot]"
+		}).Return(nil)
+		mockRows.On("Close").Return(nil)
+
+		findings, err := loadSuggestionFindings(mockDal, "repo-1")
+		assert.Nil(t, err)
+		assert.Len(t, findings, 1)
+		assert.Equal(t, "finding-1", findings[0].Id)
+		assert.Equal(t, "coderabbitai[bot]", findings[0].AiToolUser)
+		mockDal.AssertExpectations(t)
+		mockRows.AssertExpectations(t)
+	})
+
+	t.Run("cursor error", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockDal.On("Cursor", mock.Anything).Return(nil, errors.Default.New("db error"))
+
+		findings, err := loadSuggestionFindings(mockDal, "repo-1")
+		assert.Nil(t, findings)
+		assert.NotNil(t, err)
+		assert.Contains(t, fmt.Sprint(err), "db error")
+	})
+
+	t.Run("fetch error", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockRows := new(mockdal.Rows)
+
+		mockDal.On("Cursor", mock.Anything).Return(mockRows, nil)
+		mockRows.On("Next").Return(true).Once()
+		mockDal.On("Fetch", mockRows, mock.Anything).Return(errors.Default.New("scan error"))
+		mockRows.On("Close").Return(nil)
+
+		findings, err := loadSuggestionFindings(mockDal, "repo-1")
+		assert.Nil(t, findings)
+		assert.NotNil(t, err)
+		assert.Contains(t, fmt.Sprint(err), "scan error")
+	})
+}
+
+func TestLoadPRCommits(t *testing.T) {
+	t.Run("success with one row", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockRows := new(mockdal.Rows)
+
+		mockDal.On("Cursor", mock.Anything).Return(mockRows, nil)
+		mockRows.On("Next").Return(true).Once()
+		mockRows.On("Next").Return(false).Once()
+		mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
+			dst := args.Get(1).(*prCommit)
+			dst.CommitSha = "abc123"
+			dst.AuthoredDate = time.Date(2026, 3, 15, 10, 0, 0, 0, time.UTC)
+			dst.Message = "Fix handler"
+			dst.AuthorName = "dev"
+		}).Return(nil)
+		mockRows.On("Close").Return(nil)
+
+		commits, err := loadPRCommits(mockDal, "pr-1")
+		assert.Nil(t, err)
+		assert.Len(t, commits, 1)
+		assert.Equal(t, "abc123", commits[0].CommitSha)
+		assert.Equal(t, "Fix handler", commits[0].Message)
+		mockDal.AssertExpectations(t)
+	})
+
+	t.Run("cursor error", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockDal.On("Cursor", mock.Anything).Return(nil, errors.Default.New("db error"))
+
+		commits, err := loadPRCommits(mockDal, "pr-1")
+		assert.Nil(t, commits)
+		assert.NotNil(t, err)
+	})
+
+	t.Run("fetch error", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockRows := new(mockdal.Rows)
+
+		mockDal.On("Cursor", mock.Anything).Return(mockRows, nil)
+		mockRows.On("Next").Return(true).Once()
+		mockDal.On("Fetch", mockRows, mock.Anything).Return(errors.Default.New("scan error"))
+		mockRows.On("Close").Return(nil)
+
+		commits, err := loadPRCommits(mockDal, "pr-1")
+		assert.Nil(t, commits)
+		assert.NotNil(t, err)
+	})
+}
+
+func TestLoadCommitFiles(t *testing.T) {
+	t.Run("empty commitShas returns nil", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		files, err := loadCommitFiles(mockDal, []string{})
+		assert.Nil(t, err)
+		assert.Nil(t, files)
+	})
+
+	t.Run("success with one row", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockRows := new(mockdal.Rows)
+
+		mockDal.On("Cursor", mock.Anything).Return(mockRows, nil)
+		mockRows.On("Next").Return(true).Once()
+		mockRows.On("Next").Return(false).Once()
+		mockDal.On("Fetch", mockRows, mock.Anything).Run(func(args mock.Arguments) {
+			dst := args.Get(1).(*commitFileChange)
+			dst.CommitSha = "abc123"
+			dst.FilePath = "pkg/handler.go"
+			dst.Additions = 5
+			dst.Deletions = 2
+		}).Return(nil)
+		mockRows.On("Close").Return(nil)
+
+		files, err := loadCommitFiles(mockDal, []string{"abc123"})
+		assert.Nil(t, err)
+		assert.Len(t, files, 1)
+		assert.Equal(t, "pkg/handler.go", files[0].FilePath)
+		assert.Equal(t, 5, files[0].Additions)
+		mockDal.AssertExpectations(t)
+	})
+
+	t.Run("cursor error", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockDal.On("Cursor", mock.Anything).Return(nil, errors.Default.New("db error"))
+
+		files, err := loadCommitFiles(mockDal, []string{"abc123"})
+		assert.Nil(t, files)
+		assert.NotNil(t, err)
+	})
 }
