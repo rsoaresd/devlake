@@ -1,3 +1,4 @@
+#!/bin/sh
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -13,43 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-codecov:
-  require_ci_to_pass: yes
+set -e
 
-coverage:
-  precision: 2
-  round: down
-  range: "50...100"
+PLUGINS="aireview codecov testregistry"
 
-  status:
-    project:
-      default:
-        target: auto
-        threshold: 1%
-    patch:
-      default:
-        target: auto
-        threshold: 1%
+for p in $PLUGINS; do
+  echo "==> Running tests for plugin: $p"
+  go test -coverprofile="coverage-${p}.out" -covermode=atomic \
+    -coverpkg="github.com/apache/incubator-devlake/plugins/${p}/..." \
+    "./plugins/${p}/..." 2>&1 || true
+done
 
-ignore:
-  - "grafana/**"
-  - "devops/**"
-  - "backend/mocks/**"
-  - "backend/test/**"
-  - "backend/python/test/**"
-  - "**/mock_*.go"
-  - "**/*_mock.go"
-  - "**/*_test.go"
-  - "**/*_test.py"
+echo "mode: atomic" > coverage-custom-plugins.out
+for p in $PLUGINS; do
+  if [ -f "coverage-${p}.out" ]; then
+    tail -n +2 "coverage-${p}.out" >> coverage-custom-plugins.out
+    rm -f "coverage-${p}.out"
+  fi
+done
 
-flags:
-  unit-tests-go:
-    carryforward: true
-    paths:
-      - backend/plugins/aireview/
-      - backend/plugins/codecov/
-      - backend/plugins/testregistry/
-
-comment:
-  layout: "reach,diff,flags,files"
-  behavior: default
+echo ""
+echo "==> Combined coverage:"
+go tool cover -func=coverage-custom-plugins.out | tail -1

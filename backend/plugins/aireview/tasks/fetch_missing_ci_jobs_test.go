@@ -23,8 +23,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/helpers/gcshelper"
+	mockdal "github.com/apache/incubator-devlake/mocks/core/dal"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // fakeHistoryStore implements gcshelper.HistoryStore for unit tests.
@@ -71,12 +75,12 @@ func TestFetchPRBuilds_HappyPath(t *testing.T) {
 			jobPrefix: {buildPrefix},
 		},
 		files: map[string][]byte{
-			buildPrefix + "finished.json": []byte(fmt.Sprintf(
+			buildPrefix + "finished.json": fmt.Appendf(nil,
 				`{"timestamp":%d,"passed":true,"result":"SUCCESS","revision":"abc123"}`, finishedTS,
-			)),
-			buildPrefix + "started.json": []byte(fmt.Sprintf(
+			),
+			buildPrefix + "started.json": fmt.Appendf(nil,
 				`{"timestamp":%d,"commit":"abc123"}`, startedTS,
-			)),
+			),
 		},
 	}
 
@@ -142,9 +146,9 @@ func TestFetchPRBuilds_CutoffRespected(t *testing.T) {
 			jobPrefix: {buildPrefix},
 		},
 		files: map[string][]byte{
-			buildPrefix + "finished.json": []byte(fmt.Sprintf(
+			buildPrefix + "finished.json": fmt.Appendf(nil,
 				`{"timestamp":%d,"passed":false,"result":"FAILURE"}`, oldFinishedTS,
-			)),
+			),
 		},
 	}
 
@@ -185,9 +189,9 @@ func TestFetchPRBuilds_FailedBuild(t *testing.T) {
 			jobPrefix: {buildPrefix},
 		},
 		files: map[string][]byte{
-			buildPrefix + "finished.json": []byte(fmt.Sprintf(
+			buildPrefix + "finished.json": fmt.Appendf(nil,
 				`{"timestamp":%d,"passed":false,"result":"FAILURE"}`, finishedTS,
-			)),
+			),
 		},
 	}
 
@@ -259,8 +263,8 @@ func TestFetchPRBuilds_MultipleJobs(t *testing.T) {
 			job2Prefix:  {build2Prefix},
 		},
 		files: map[string][]byte{
-			build1Prefix + "finished.json": []byte(fmt.Sprintf(`{"timestamp":%d,"passed":true,"result":"SUCCESS"}`, finishedTS)),
-			build2Prefix + "finished.json": []byte(fmt.Sprintf(`{"timestamp":%d,"passed":false,"result":"FAILURE"}`, finishedTS)),
+			build1Prefix + "finished.json": fmt.Appendf(nil, `{"timestamp":%d,"passed":true,"result":"SUCCESS"}`, finishedTS),
+			build2Prefix + "finished.json": fmt.Appendf(nil, `{"timestamp":%d,"passed":false,"result":"FAILURE"}`, finishedTS),
 		},
 	}
 
@@ -294,13 +298,119 @@ func TestFetchPRBuilds_MultipleJobs(t *testing.T) {
 // nopLogger is a no-op log.Logger implementation for unit tests.
 type nopLogger struct{}
 
-func (*nopLogger) IsLevelEnabled(_ log.LogLevel) bool                  { return false }
-func (*nopLogger) Printf(_ string, _ ...interface{})                    {}
-func (*nopLogger) Log(_ log.LogLevel, _ string, _ ...interface{})      {}
-func (*nopLogger) Debug(_ string, _ ...interface{})                     {}
-func (*nopLogger) Info(_ string, _ ...interface{})                      {}
-func (*nopLogger) Warn(_ error, _ string, _ ...interface{})             {}
-func (*nopLogger) Error(_ error, _ string, _ ...interface{})            {}
-func (*nopLogger) Nested(_ string) log.Logger                           { return &nopLogger{} }
-func (*nopLogger) GetConfig() *log.LoggerConfig                         { return &log.LoggerConfig{} }
-func (*nopLogger) SetStream(_ *log.LoggerStreamConfig)                  {}
+func (*nopLogger) IsLevelEnabled(_ log.LogLevel) bool        { return false }
+func (*nopLogger) Printf(_ string, _ ...any)                 {}
+func (*nopLogger) Log(_ log.LogLevel, _ string, _ ...any)    {}
+func (*nopLogger) Debug(_ string, _ ...any)                  {}
+func (*nopLogger) Info(_ string, _ ...any)                   {}
+func (*nopLogger) Warn(_ error, _ string, _ ...any)          {}
+func (*nopLogger) Error(_ error, _ string, _ ...any)         {}
+func (*nopLogger) Nested(_ string) log.Logger                { return &nopLogger{} }
+func (*nopLogger) GetConfig() *log.LoggerConfig              { return &log.LoggerConfig{} }
+func (*nopLogger) SetStream(_ *log.LoggerStreamConfig)       {}
+
+func TestFindMissingPRs(t *testing.T) {
+	cutoff := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("success with org/repo name", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		callCount := 0
+		mockDal.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+			callCount++
+			if callCount == 1 {
+				// First call: repo name query — anonymous struct
+				dst := args.Get(0).(*[]struct {
+					Name string `gorm:"column:name"`
+				})
+				*dst = []struct {
+					Name string `gorm:"column:name"`
+				}{{Name: "org/my-repo"}}
+			} else {
+				// Second call: missing PRs query
+				dst := args.Get(0).(*[]missingPRRow)
+				*dst = []missingPRRow{
+					{PullRequestKey: "42", RepoName: "org/my-repo"},
+				}
+			}
+		})
+
+		result, err := findMissingPRs(mockDal, "repo-1", cutoff)
+		assert.Nil(t, err)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "42", result[0].PullRequestKey)
+		assert.Equal(t, "org", result[0].OrgName)
+		assert.Equal(t, "my-repo", result[0].RepoShortName)
+		assert.Equal(t, "org/my-repo", result[0].RepoFullName)
+	})
+
+	t.Run("repo name without slash", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		callCount := 0
+		mockDal.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+			callCount++
+			if callCount == 1 {
+				dst := args.Get(0).(*[]struct {
+					Name string `gorm:"column:name"`
+				})
+				*dst = []struct {
+					Name string `gorm:"column:name"`
+				}{{Name: "simple-repo"}}
+			} else {
+				dst := args.Get(0).(*[]missingPRRow)
+				*dst = []missingPRRow{
+					{PullRequestKey: "10", RepoName: "simple-repo"},
+				}
+			}
+		})
+
+		result, err := findMissingPRs(mockDal, "repo-2", cutoff)
+		assert.Nil(t, err)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "", result[0].OrgName)
+		assert.Equal(t, "simple-repo", result[0].RepoShortName)
+	})
+
+	t.Run("repo name query error", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockDal.On("All", mock.Anything, mock.Anything).Return(errors.Default.New("db error"))
+
+		result, err := findMissingPRs(mockDal, "repo-1", cutoff)
+		assert.Nil(t, result)
+		assert.NotNil(t, err)
+		assert.Contains(t, fmt.Sprint(err), "db error")
+	})
+
+	t.Run("repo not found", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		mockDal.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+			// Leave the destination slice empty (zero rows)
+		})
+
+		result, err := findMissingPRs(mockDal, "nonexistent-repo", cutoff)
+		assert.Nil(t, result)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("missing PRs query error", func(t *testing.T) {
+		mockDal := new(mockdal.Dal)
+		callCount := 0
+		mockDal.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+			callCount++
+			if callCount == 1 {
+				dst := args.Get(0).(*[]struct {
+					Name string `gorm:"column:name"`
+				})
+				*dst = []struct {
+					Name string `gorm:"column:name"`
+				}{{Name: "org/my-repo"}}
+			}
+		}).Once()
+		mockDal.On("All", mock.Anything, mock.Anything).Return(errors.Default.New("query error")).Once()
+
+		result, err := findMissingPRs(mockDal, "repo-1", cutoff)
+		assert.Nil(t, result)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "query error")
+	})
+}
