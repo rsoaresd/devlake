@@ -29,7 +29,7 @@ FROM --platform=linux/arm64 debian:bookworm as debian-arm64
 RUN apt-get update
 RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
 
-FROM --platform=$BUILDPLATFORM golang:1.20.5-bookworm as builder
+FROM --platform=$BUILDPLATFORM golang:1.26-bookworm as builder
 
 # docker build --build-arg GOPROXY=https://goproxy.io,direct -t mericodev/lake .
 ARG GOPROXY=
@@ -45,7 +45,7 @@ RUN if [ "$(arch)" != "aarch64" ] ; then \
         apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu ; \
     fi
 
-RUN go install github.com/vektra/mockery/v2@v2.20.0
+RUN go install github.com/vektra/mockery/v2@v2.53.6
 RUN go install github.com/swaggo/swag/cmd/swag@v1.16.1
 
 COPY --from=debian-arm64 /usr/include /rootfs-arm64/usr/include
