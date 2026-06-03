@@ -30,8 +30,12 @@ var basicRes context.BasicRes
 
 var dsHelper *api.DsHelper[models.TestRegistryConnection, models.TestRegistryScope, models.TestRegistryScopeConfig]
 
+// connectionHelper is used by the push endpoint to look up connections by ID or name.
+var connectionHelper *api.ConnectionApiHelper
+
 func Init(br context.BasicRes, p plugin.PluginMeta) {
 	basicRes = br
+	connectionHelper = api.NewConnectionHelper(br, nil, p.Name())
 
 	// Use DataSourceHelper for scope config support
 	dsHelper = api.NewDataSourceHelper[

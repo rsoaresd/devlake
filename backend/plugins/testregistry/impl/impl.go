@@ -172,5 +172,15 @@ func (p TestRegistry) ApiResources() map[string]map[string]plugin.ApiResourceHan
 		"scope-config/:scopeConfigId/projects": {
 			"GET": api.GetProjectsByScopeConfig,
 		},
+		// Push endpoints: external CI systems POST JUnit XML results here.
+		"connections/:connectionId/test_results": {
+			"POST": api.PostTestResults,
+		},
+		":connectionId/test_results": {
+			"POST": api.PostTestResults,
+		},
+		"connections/by-name/:connectionName/test_results": {
+			"POST": api.PostTestResultsByName,
+		},
 	}
 }

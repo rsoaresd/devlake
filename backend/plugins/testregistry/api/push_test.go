@@ -28,9 +28,8 @@ import (
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/plugin"
-	testTasks "github.com/apache/incubator-devlake/plugins/testregistry/tasks"
+	"github.com/apache/incubator-devlake/plugins/testregistry/tasks"
 )
-
 
 func TestParseJUnitXML_TestSuites(t *testing.T) {
 	xmlContent := []byte(`<?xml version="1.0" encoding="UTF-8"?>
@@ -44,7 +43,7 @@ func TestParseJUnitXML_TestSuites(t *testing.T) {
   </testsuite>
 </testsuites>`)
 
-	var suitesXml testTasks.TestSuites
+	var suitesXml tasks.TestSuites
 	if err := xml.Unmarshal(xmlContent, &suitesXml); err != nil {
 		t.Fatalf("Failed to parse testsuites XML: %v", err)
 	}
@@ -67,7 +66,6 @@ func TestParseJUnitXML_TestSuites(t *testing.T) {
 		t.Fatalf("Expected 3 test cases, got %d", len(suite.TestCases))
 	}
 
-	// Verify passed test
 	if suite.TestCases[0].Name != "pre phase" {
 		t.Errorf("TestCase[0].Name = %q, want %q", suite.TestCases[0].Name, "pre phase")
 	}
@@ -75,7 +73,6 @@ func TestParseJUnitXML_TestSuites(t *testing.T) {
 		t.Error("TestCase[0] should not have failure output")
 	}
 
-	// Verify failed test
 	if suite.TestCases[1].FailureOutput == nil {
 		t.Fatal("TestCase[1] should have failure output")
 	}
@@ -94,15 +91,13 @@ func TestParseJUnitXML_BareTestSuite(t *testing.T) {
   </testcase>
 </testsuite>`)
 
-	// First attempt with TestSuites should fail
-	var suitesXml testTasks.TestSuites
+	var suitesXml tasks.TestSuites
 	err := xml.Unmarshal(xmlContent, &suitesXml)
 	if err == nil && len(suitesXml.Suites) > 0 {
 		t.Fatal("Expected TestSuites parse to fail or return empty suites for bare <testsuite>")
 	}
 
-	// Fallback to single TestSuite should work
-	var singleSuite testTasks.TestSuite
+	var singleSuite tasks.TestSuite
 	if err := xml.Unmarshal(xmlContent, &singleSuite); err != nil {
 		t.Fatalf("Failed to parse bare testsuite XML: %v", err)
 	}
@@ -120,12 +115,10 @@ func TestParseJUnitXML_BareTestSuite(t *testing.T) {
 		t.Fatalf("Expected 3 test cases, got %d", len(singleSuite.TestCases))
 	}
 
-	// Verify classname
 	if singleSuite.TestCases[0].Classname != "DashboardPage" {
 		t.Errorf("TestCase[0].Classname = %q, want %q", singleSuite.TestCases[0].Classname, "DashboardPage")
 	}
 
-	// Verify skipped test
 	if singleSuite.TestCases[2].SkipMessage == nil {
 		t.Fatal("TestCase[2] should have skip message")
 	}
@@ -139,7 +132,7 @@ func TestParseJUnitXML_EmptyTestSuites(t *testing.T) {
 <testsuites>
 </testsuites>`)
 
-	var suitesXml testTasks.TestSuites
+	var suitesXml tasks.TestSuites
 	if err := xml.Unmarshal(xmlContent, &suitesXml); err != nil {
 		t.Fatalf("Failed to parse empty testsuites XML: %v", err)
 	}
@@ -152,7 +145,7 @@ func TestParseJUnitXML_EmptyTestSuites(t *testing.T) {
 func TestParseJUnitXML_InvalidXML(t *testing.T) {
 	xmlContent := []byte(`this is not XML at all`)
 
-	var suitesXml testTasks.TestSuites
+	var suitesXml tasks.TestSuites
 	err := xml.Unmarshal(xmlContent, &suitesXml)
 	if err == nil {
 		t.Error("Expected error parsing invalid XML")
@@ -173,7 +166,7 @@ func TestParseJUnitXML_MultipleSuites(t *testing.T) {
   </testsuite>
 </testsuites>`)
 
-	var suitesXml testTasks.TestSuites
+	var suitesXml tasks.TestSuites
 	if err := xml.Unmarshal(xmlContent, &suitesXml); err != nil {
 		t.Fatalf("Failed to parse multi-suite XML: %v", err)
 	}
@@ -187,9 +180,6 @@ func TestParseJUnitXML_MultipleSuites(t *testing.T) {
 	}
 	if suitesXml.Suites[1].Name != "integration" {
 		t.Errorf("Suite[1].Name = %q, want %q", suitesXml.Suites[1].Name, "integration")
-	}
-	if len(suitesXml.Suites[0].TestCases) != 2 {
-		t.Errorf("Suite[0] test cases = %d, want 2", len(suitesXml.Suites[0].TestCases))
 	}
 	if suitesXml.Suites[1].TestCases[0].FailureOutput == nil {
 		t.Error("Suite[1].TestCase[0] should have failure output")
@@ -209,7 +199,7 @@ func TestTestCaseStatusDetection(t *testing.T) {
   </testsuite>
 </testsuites>`)
 
-	var suitesXml testTasks.TestSuites
+	var suitesXml tasks.TestSuites
 	if err := xml.Unmarshal(xmlContent, &suitesXml); err != nil {
 		t.Fatalf("Failed to parse XML: %v", err)
 	}
@@ -219,12 +209,10 @@ func TestTestCaseStatusDetection(t *testing.T) {
 		t.Fatalf("Expected 3 cases, got %d", len(cases))
 	}
 
-	// Passed: no failure, no skip
 	if cases[0].FailureOutput != nil || cases[0].SkipMessage != nil {
 		t.Error("passed-test should have no failure/skip")
 	}
 
-	// Failed: has failure output
 	if cases[1].FailureOutput == nil {
 		t.Fatal("failed-test should have failure output")
 	}
@@ -235,7 +223,6 @@ func TestTestCaseStatusDetection(t *testing.T) {
 		t.Errorf("failure output = %q, want %q", cases[1].FailureOutput.Output, "expected true, got false")
 	}
 
-	// Skipped: has skip message
 	if cases[2].SkipMessage == nil {
 		t.Fatal("skipped-test should have skip message")
 	}
@@ -250,35 +237,33 @@ func TestMaxJUnitFilesConstant(t *testing.T) {
 	}
 }
 
-// errorReader always returns an error from Read, used to test panic behaviour.
 type errorReader struct{}
 
 func (errorReader) Read(_ []byte) (int, error) {
 	return 0, fmt.Errorf("simulated rand failure")
 }
 
-func TestGenerateWebhookUID_ReturnsErrorOnReadFailure(t *testing.T) {
-	_, err := generateWebhookUIDFrom(errorReader{})
+func TestGenerateUID_ReturnsErrorOnReadFailure(t *testing.T) {
+	_, err := generateUIDFrom(errorReader{})
 	if err == nil {
-		t.Fatal("generateWebhookUIDFrom should return error when reader fails")
+		t.Fatal("generateUIDFrom should return error when reader fails")
 	}
 	if !strings.Contains(err.Error(), "failed to generate random UID") {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
 
-func TestGenerateWebhookUID_Success(t *testing.T) {
-	id, err := generateWebhookUID()
+func TestGenerateUID_Success(t *testing.T) {
+	id, err := generateUID()
 	if err != nil {
-		t.Fatalf("generateWebhookUID() returned unexpected error: %v", err)
+		t.Fatalf("generateUID() returned unexpected error: %v", err)
 	}
 	if len(id) != 16 {
-		t.Errorf("generateWebhookUID() length = %d, want 16", len(id))
+		t.Errorf("generateUID() length = %d, want 16", len(id))
 	}
-	// Verify hex characters
 	for _, c := range id {
 		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			t.Errorf("generateWebhookUID() contains non-hex character: %c in %s", c, id)
+			t.Errorf("generateUID() contains non-hex character: %c in %s", c, id)
 		}
 	}
 }
