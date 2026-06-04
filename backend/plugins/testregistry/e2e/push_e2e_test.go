@@ -31,8 +31,6 @@ import (
 	pluginhelper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	trmodels "github.com/apache/incubator-devlake/plugins/testregistry/models"
 	testregistry "github.com/apache/incubator-devlake/plugins/testregistry/impl"
-	webhook "github.com/apache/incubator-devlake/plugins/webhook/impl"
-	webhookModels "github.com/apache/incubator-devlake/plugins/webhook/models"
 	"github.com/apache/incubator-devlake/test/helper"
 	"github.com/stretchr/testify/require"
 )
@@ -50,7 +48,7 @@ const junitSingle = `<?xml version="1.0" encoding="UTF-8"?>
   </testsuite>
 </testsuites>`
 
-// postTestResults sends a multipart POST to the webhook test_results endpoint.
+// postTestResults sends a multipart POST to the testregistry push endpoint.
 // fields are form fields; junitXML is optional JUnit content (empty string = no file).
 func postTestResults(t *testing.T, endpoint string, connID uint64, fields map[string]string, junitXML string) *http.Response {
 	t.Helper()
@@ -67,7 +65,7 @@ func postTestResults(t *testing.T, endpoint string, connID uint64, fields map[st
 	}
 	require.NoError(t, w.Close())
 
-	url := fmt.Sprintf("%s/plugins/webhook/connections/%d/test_results", endpoint, connID)
+	url := fmt.Sprintf("%s/plugins/testregistry/connections/%d/test_results", endpoint, connID)
 	req, err := http.NewRequest(http.MethodPost, url, &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", w.FormDataContentType())
@@ -82,15 +80,18 @@ func countRows[T any](t *testing.T, db dal.Dal, dest *[]T, clauses ...dal.Clause
 	require.NoError(t, db.All(dest, clauses...))
 }
 
-func TestWebhookTestResults(t *testing.T) {
+func TestTestRegistryPush(t *testing.T) {
 	client := helper.StartDevLakeServer(t, []plugin.PluginMeta{
-		webhook.Webhook{},
 		testregistry.TestRegistry{},
 	})
 	db := client.GetDal()
 
-	conn := client.CreateConnection("webhook", webhookModels.WebhookConnection{
-		BaseConnection: pluginhelper.BaseConnection{Name: "e2e-webhook"},
+	conn := client.CreateConnection("testregistry", trmodels.TestRegistryConnection{
+		BaseConnection: pluginhelper.BaseConnection{Name: "e2e-push"},
+		CITool:         trmodels.CIToolOpenshiftCI,
+		Project:        "e2e-project",
+		GitHubOrganization: "e2e-org",
+		GitHubToken:    "fake-token",
 	})
 	connID := conn.ID
 
@@ -123,7 +124,7 @@ func TestWebhookTestResults(t *testing.T) {
 		require.Equal(t, "test-org", jobs[0].Organization)
 
 		// Verify ci_test_suites
-		domainJobID := fmt.Sprintf("webhook:%d:e2e-job-1", connID)
+		domainJobID := fmt.Sprintf("testregistry:%d:e2e-job-1", connID)
 		var suites []trmodels.TestSuite
 		countRows(t, db, &suites, dal.Where("connection_id = ? AND job_id = ?", connID, domainJobID))
 		require.Len(t, suites, 1)
@@ -167,7 +168,6 @@ func TestWebhookTestResults(t *testing.T) {
 	})
 
 	t.Run("idempotent_on_repeat_post", func(t *testing.T) {
-		// Post the same jobId twice — CreateOrUpdate must not duplicate rows.
 		resp1 := postTestResults(t, client.Endpoint, connID, baseFields, junitSingle)
 		resp1.Body.Close()
 		require.Equal(t, http.StatusOK, resp1.StatusCode)
