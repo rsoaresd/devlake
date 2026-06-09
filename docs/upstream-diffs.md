@@ -25,3 +25,19 @@ directory leak in `doubleClone()`.
 
 **Rebase notes:** Touches clone strategy selection in `clone_gitcli.go`.
 Watch for upstream changes to `CloneRepo()`, `shallowClone()`, or `doubleClone()`.
+
+ ## jira: Scope collectParentIssues to current board
+  
+  **Files:**
+  - `backend/plugins/jira/tasks/parent_issue_collector.go` 
+  - `backend/plugins/jira/impl/impl.go`
+  
+  **Reason:** collectParentIssues queries all issues on the Jira connection for epic keys
+  (filtering by connection_id only). Scoped the epic key query to the current board via board_id filter.
+  
+  **Upstream status:** N/A — collectParentIssues is Konflux-specific (commit f1c634d), not present in upstream Apache DevLake.
+  **Upstream PR:** none — not applicable
+  **Owner:** @cmulliga
+  
+  **Rebase notes:** `parent_issue_collector.go` is Konflux-only, no upstream conflicts expected.
+  `impl.go` has a Konflux addition (`CollectParentIssuesMeta` in `SubTaskMetas()`) — watch for upstream changes to the subtask registration list.
