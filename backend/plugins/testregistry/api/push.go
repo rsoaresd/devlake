@@ -33,16 +33,15 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/dbhelper"
 	"github.com/apache/incubator-devlake/plugins/testregistry/models"
-	testTasks "github.com/apache/incubator-devlake/plugins/testregistry/tasks"
-	webhookModels "github.com/apache/incubator-devlake/plugins/webhook/models"
+	"github.com/apache/incubator-devlake/plugins/testregistry/tasks"
 )
 
 const maxJUnitFilesPerRequest = 100
 
-// PostTestResults handles pushing CI test results via webhook by connection ID.
+// PostTestResults handles pushing CI test results via the testregistry plugin by connection ID.
 // Accepts multipart/form-data with job metadata as form fields and JUnit XML as file uploads.
 func PostTestResults(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	connection := &webhookModels.WebhookConnection{}
+	connection := &models.TestRegistryConnection{}
 	err := connectionHelper.First(connection, input.Params)
 	if err != nil {
 		return nil, err
@@ -50,9 +49,9 @@ func PostTestResults(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput,
 	return postTestResultsImpl(input, connection.ID)
 }
 
-// PostTestResultsByName handles pushing CI test results via webhook by connection name.
+// PostTestResultsByName handles pushing CI test results via the testregistry plugin by connection name.
 func PostTestResultsByName(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	connection := &webhookModels.WebhookConnection{}
+	connection := &models.TestRegistryConnection{}
 	err := connectionHelper.FirstByName(connection, input.Params)
 	if err != nil {
 		return nil, err
@@ -81,7 +80,7 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 	}
 
 	// Validate field lengths to prevent DB column overflow (job_id is varchar(255), job_name is varchar(500))
-	domainJobId := fmt.Sprintf("webhook:%d:%s", connectionId, jobId)
+	domainJobId := fmt.Sprintf("testregistry:%d:%s", connectionId, jobId)
 	if len(domainJobId) > 255 {
 		return nil, errors.BadInput.New("jobId is too long; the prefixed ID must fit in 255 characters")
 	}
@@ -208,14 +207,14 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 		}
 
 		// Parse XML — try <testsuites> first, then bare <testsuite>
-		var suitesXml testTasks.TestSuites
+		var suitesXml tasks.TestSuites
 		firstErr := xml.Unmarshal(xmlContent, &suitesXml)
 
 		// Handle bare <testsuite> root element (or failed <testsuites> parse)
 		if len(suitesXml.Suites) == 0 {
-			var singleSuite testTasks.TestSuite
+			var singleSuite tasks.TestSuite
 			if xmlErr := xml.Unmarshal(xmlContent, &singleSuite); xmlErr == nil && singleSuite.Name != "" {
-				suitesXml.Suites = []*testTasks.TestSuite{&singleSuite}
+				suitesXml.Suites = []*tasks.TestSuite{&singleSuite}
 			}
 		}
 
@@ -236,7 +235,7 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 				continue
 			}
 
-			suiteId, uidErr := generateWebhookUID()
+			suiteId, uidErr := generateUID()
 			if uidErr != nil {
 				err = uidErr
 				return nil, err
@@ -263,7 +262,7 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 					continue
 				}
 
-				testCaseId, uidErr := generateWebhookUID()
+				testCaseId, uidErr := generateUID()
 				if uidErr != nil {
 					err = uidErr
 					return nil, err
@@ -317,12 +316,12 @@ func postTestResultsImpl(input *plugin.ApiResourceInput, connectionId uint64) (*
 	}, nil
 }
 
-// generateWebhookUID creates a random 16-char hex string for unique IDs.
-func generateWebhookUID() (string, errors.Error) {
-	return generateWebhookUIDFrom(rand.Reader)
+// generateUID creates a random 16-char hex string for unique IDs.
+func generateUID() (string, errors.Error) {
+	return generateUIDFrom(rand.Reader)
 }
 
-func generateWebhookUIDFrom(r io.Reader) (string, errors.Error) {
+func generateUIDFrom(r io.Reader) (string, errors.Error) {
 	b := make([]byte, 8)
 	if _, readErr := r.Read(b); readErr != nil {
 		return "", errors.Default.Wrap(readErr, "failed to generate random UID")

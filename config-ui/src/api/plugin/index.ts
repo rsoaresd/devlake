@@ -18,6 +18,7 @@
 
 import { request } from '@/utils';
 
+import * as agentready from './agentready';
 import * as aireview from './aireview';
 import * as jira from './jira';
 import * as tapd from './tapd';
@@ -27,6 +28,7 @@ export const list = (): Promise<[{ plugin: string }]> => request('/plugins');
 
 export const plugin = {
   list,
+  agentready,
   aireview,
   jira,
   tapd,

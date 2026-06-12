@@ -12,7 +12,7 @@ These rules apply to all repositories using centralized AI rules management.
 
 2. **No working files in repo root**
 
-   - Root is only for repo metadata and config: `CLAUDE.md`, `TODO.md`, `README.md`, `LICENSE`, `.gitignore`, dependency files, tooling configs.
+   - Root is only for repo metadata and config: `AGENTS.md`, `CLAUDE.md`, `TODO.md`, `README.md`, `LICENSE`, `.gitignore`, dependency files, tooling configs.
    - All code, docs, tests, notes, experiments, and scripts go into subfolders.
 
 3. **Planning lives in `TODO.md` at root**
@@ -112,7 +112,7 @@ Use an ADR when:
 ### 4.2 Internal Documentation files
 
 - Project overviews: `docs/overview.md`, `docs/architecture.md`
-- Guides: `docs/howto-<topic>.md`
+- Guides: `docs/<topic>.md`
 - Research: `docs/research/<topic>.md`
 
 ---
@@ -781,3 +781,6 @@ podman compose -f docker-compose-dev.yml exec mysql mysql -uroot -padmin -e "
 - Tests next to source: `foo.go` → `foo_test.go`
 - E2E test fixtures: `e2e/raw_tables/*.csv`
 - Migrations: `models/migrationscripts/`
+
+Also follow the rules in [AGENTS.md](./AGENTS.md) — plugin ownership and upstream
+divergence tracking.

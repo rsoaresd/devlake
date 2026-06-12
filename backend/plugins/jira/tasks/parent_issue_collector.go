@@ -50,6 +50,7 @@ func CollectParentIssues(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	logger := taskCtx.GetLogger()
 	connectionId := data.Options.ConnectionId
+    boardId := data.Options.BoardId
 
 	logger.Info("collecting parent issues for connection_id=%d, board_id=%d", connectionId, data.Options.BoardId)
 
@@ -63,9 +64,9 @@ func CollectParentIssues(taskCtx plugin.SubTaskContext) errors.Error {
 			EpicKey string
 		}
 		err := db.All(&epicKeys,
-			dal.Select("DISTINCT epic_key"),
-			dal.From(&models.JiraIssue{}),
-			dal.Where("connection_id = ? AND epic_key IS NOT NULL AND epic_key != ''", connectionId),
+            dal.Select("DISTINCT epic_key"),
+            dal.From(&models.JiraIssue{}),
+            dal.Where("connection_id = ? AND epic_key IS NOT NULL AND epic_key != '' AND issue_id IN (SELECT issue_id FROM _tool_jira_board_issues WHERE connection_id = ? AND board_id = ?)", connectionId, connectionId, boardId),
 		)
 		if err != nil {
 			return errors.Default.Wrap(err, "failed to query epic_key values")
