@@ -73,19 +73,22 @@ func CollectRepoConfig(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	service := "github"
-	branch := "main"
-	if data.Repo != nil {
-		if data.Repo.Service != "" {
-			service = data.Repo.Service
-		}
-		if data.Repo.Branch != "" {
-			branch = data.Repo.Branch
-		}
+	if data.Repo == nil {
+		logger.Warn(nil, "[Codecov] CollectRepoConfig: No repo data available for %s, skipping", data.Options.FullName)
+		return nil
 	}
 
-	// Skip private repos — unauthenticated requests won't work
-	if data.Repo != nil && data.Repo.Private {
+	service := data.Repo.Service
+	if service == "" {
+		service = "github"
+	}
+	branch := data.Repo.Branch
+	if branch == "" {
+		logger.Warn(nil, "[Codecov] CollectRepoConfig: No branch configured for %s/%s, skipping", owner, repo)
+		return nil
+	}
+
+	if data.Repo.Private {
 		logger.Info("[Codecov] CollectRepoConfig: Skipping private repo %s/%s", owner, repo)
 		return nil
 	}
