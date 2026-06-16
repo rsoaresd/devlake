@@ -37,5 +37,6 @@ func All() []plugin.MigrationScript {
 		new(addPatchToComparisons),
 		new(addCoverageToFlags),
 		new(addLineCountsToCommitCoverages),
+		new(fixCommitsDedupAndDropId),
 	}
 }
