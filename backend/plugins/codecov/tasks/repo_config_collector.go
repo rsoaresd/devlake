@@ -18,12 +18,14 @@ limitations under the License.
 package tasks
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
@@ -105,7 +107,7 @@ func CollectRepoConfig(taskCtx plugin.SubTaskContext) errors.Error {
 			break
 		}
 
-		body, fetchErr := fetchFile(rawURL)
+		body, fetchErr := fetchFile(taskCtx.GetContext(), rawURL)
 		if fetchErr != nil {
 			logger.Info("[Codecov] CollectRepoConfig: %s not found at %s", filename, rawURL)
 			continue
@@ -166,8 +168,17 @@ func buildRawContentURL(service, owner, repo, branch, filename string) string {
 	}
 }
 
-func fetchFile(rawURL string) (string, error) {
-	resp, err := http.Get(rawURL) //nolint:gosec
+const fetchTimeout = 15 * time.Second
+const maxConfigSize = 1 << 20 // 1 MiB
+
+func fetchFile(ctx context.Context, rawURL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	client := &http.Client{Timeout: fetchTimeout}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -177,7 +188,7 @@ func fetchFile(rawURL string) (string, error) {
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxConfigSize))
 	if err != nil {
 		return "", err
 	}

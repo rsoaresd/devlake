@@ -70,6 +70,7 @@ func (p Codecov) GetTablesInfo() []dal.Tabler {
 		&models.CodecovCoverage{},
 		&models.CodecovCoverageTrend{},
 		&models.CodecovCommitCoverage{},
+		&models.CodecovRepoConfig{},
 	}
 }
 

@@ -18,6 +18,7 @@ limitations under the License.
 package tasks
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -58,7 +59,7 @@ func TestFetchFile_Success(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	body, err := fetchFile(ts.URL)
+	body, err := fetchFile(context.Background(), ts.URL)
 	assert.NoError(t, err)
 	assert.Contains(t, body, "target: 80%")
 }
@@ -69,13 +70,26 @@ func TestFetchFile_404(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	_, err := fetchFile(ts.URL)
+	_, err := fetchFile(context.Background(), ts.URL)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "404")
 }
 
 func TestFetchFile_BadURL(t *testing.T) {
-	_, err := fetchFile("http://127.0.0.1:1/nonexistent")
+	_, err := fetchFile(context.Background(), "http://127.0.0.1:1/nonexistent")
+	assert.Error(t, err)
+}
+
+func TestFetchFile_CancelledContext(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("data"))
+	}))
+	defer ts.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := fetchFile(ctx, ts.URL)
 	assert.Error(t, err)
 }
 
