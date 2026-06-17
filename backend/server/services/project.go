@@ -153,7 +153,12 @@ func CreateProject(projectInput *models.ApiInputProject) (*models.ApiOutputProje
 			TimeAfter: func() *time.Time {
 				days := defaultSyncDays
 				if v := cfg.GetString("DEFAULT_SYNC_DAYS"); v != "" {
-					if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+					v = strings.TrimSpace(v)
+					if parsed, err := strconv.Atoi(v); err != nil {
+						logger.Warn(nil, "DEFAULT_SYNC_DAYS has invalid value %q, falling back to %d days", v, defaultSyncDays)
+					} else if parsed <= 0 {
+						logger.Warn(nil, "DEFAULT_SYNC_DAYS must be positive (got %d), falling back to %d days", parsed, defaultSyncDays)
+					} else {
 						days = parsed
 					}
 				}
