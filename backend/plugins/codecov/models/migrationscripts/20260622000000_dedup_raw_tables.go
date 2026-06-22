@@ -42,9 +42,14 @@ func dedupOneTable(basicRes context.BasicRes, table string) errors.Error {
 	newTable := table + "_dedup"
 	oldTable := table + "_old"
 
-	// Clean up any leftover temp tables from a previous interrupted run
-	_ = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", newTable))
-	_ = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", oldTable))
+	// Clean up any leftover temp tables from a previous interrupted run.
+	// These DROPs use IF EXISTS so the only real failure mode is permissions/locks.
+	if dropErr := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", newTable)); dropErr != nil {
+		logger.Warn(dropErr, "[dedup-raw] failed to drop leftover %s", newTable)
+	}
+	if dropErr := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", oldTable)); dropErr != nil {
+		logger.Warn(dropErr, "[dedup-raw] failed to drop leftover %s", oldTable)
+	}
 
 	logger.Info("[dedup-raw] deduplicating %s — creating clean copy", table)
 
@@ -65,7 +70,9 @@ func dedupOneTable(basicRes context.BasicRes, table string) errors.Error {
 		) keep ON t.id = keep.max_id
 	`, newTable, table, table))
 	if err != nil {
-		_ = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", newTable))
+		if cleanupErr := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", newTable)); cleanupErr != nil {
+			logger.Warn(cleanupErr, "[dedup-raw] also failed to clean up %s after INSERT error", newTable)
+		}
 		return errors.Default.Wrap(err, fmt.Sprintf("failed to copy unique rows into %s", newTable))
 	}
 
@@ -73,7 +80,9 @@ func dedupOneTable(basicRes context.BasicRes, table string) errors.Error {
 	err = db.Exec(fmt.Sprintf("RENAME TABLE `%s` TO `%s`, `%s` TO `%s`",
 		table, oldTable, newTable, table))
 	if err != nil {
-		_ = db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", newTable))
+		if cleanupErr := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", newTable)); cleanupErr != nil {
+			logger.Warn(cleanupErr, "[dedup-raw] also failed to clean up %s after RENAME error", newTable)
+		}
 		return errors.Default.Wrap(err, fmt.Sprintf("failed to rename tables for %s", table))
 	}
 
