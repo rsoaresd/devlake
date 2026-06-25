@@ -35,6 +35,10 @@ All data required to fully populate DevLake's Jira tool-layer tables is present 
 
 **Confirmed gap — user PII.** Assignee and creator names/IDs are stripped from the Snowflake tables (`_NON_PII` suffix). DevLake `assignee_name`, `assignee_id`, `creator_name` fields will be null. This affects "issues by assignee" dashboard breakdowns but does not affect flow metrics (lead time, cycle time, DORA).
 
+**Non-team contributor noise — known gap.** A Jira project space is often shared — upstream contributors or members of adjacent teams may file or work on issues in the same project. Schema investigation confirmed that all user-identifying data is stripped: the `Team` custom field has 5.17M rows but all value columns are null, `JIRA_RAPIDVIEW_RHAI` (board JQL filter) is not present, and assignee/creator are stripped. There is currently no reliable way to filter non-team contributors using Snowflake data alone.
+
+This gap will be addressed if and when the use case arises. The fallback is to supplement the Snowflake sync with a targeted Jira API query to retrieve team membership or board membership data — a minimal additional call rather than a full API-based ingestion.
+
 ## Proposed Approach
 
 Build a new plugin `jira_snowflake` that:
@@ -77,17 +81,9 @@ For historical analysis and weekly/monthly reporting the freshness trade-off is 
 
 **Authentication.** A dedicated Snowflake service account with an RSA key pair is required. Browser SSO (`externalbrowser`) cannot be used in a headless server. The private key PEM is stored encrypted in DevLake's connection record.
 
-**Warehouse.** The plugin uses the `DEFAULT` warehouse, which is the warehouse we have access to. It is a Medium, multi-cluster (1–2) warehouse with auto-resume enabled. No additional provisioning is required. Because it is a shared warehouse, DevLake queries run alongside other workloads — this is expected and the multi-cluster configuration handles concurrent demand automatically.
+**Warehouse.** The plugin uses the `DEFAULT` warehouse, which is the warehouse we have access to. It is a Medium, multi-cluster (1–2) warehouse with auto-resume enabled. No additional provisioning is required. Because it is a shared warehouse, DevLake queries run alongside other workloads — this is expected and the multi-cluster configuration should handle concurrent demand automatically.
 
-**Concurrency.** With a multi-cluster warehouse, queries queue only when all clusters are at capacity, which is unlikely for DevLake's sync workloads. If pipelines are scheduled off-peak, contention is negligible.
-
-## Alternatives Considered
-
-**Extend the existing Jira plugin with a Snowflake data source option.** Rejected: the existing plugin's collector layer is tightly coupled to the Jira REST API client. Adding a separate code path for Snowflake would create significant branching complexity. A separate plugin with the same tool-layer schema is cleaner and isolates the two data sources.
-
-**Use a generic Snowflake connector.** Rejected: DevLake's Snowflake plugin (if one existed) would produce raw data with no awareness of Jira's domain model. The `jira_snowflake` plugin must produce `_tool_jira_*` rows so that the existing Jira convertor tasks can run unchanged and produce correct domain data (issues, changelogs, sprints) with proper `std_type` / `std_status` mapping.
-
-**Continue using the Jira API plugin for all projects.** Valid for projects outside Red Hat's Jira instance. For Red Hat projects, the redundancy and backfill speed are the main drivers for switching.
+**Concurrency.** With a multi-cluster warehouse, queries queue only when all clusters are at capacity. 
 
 ---
 
@@ -159,11 +155,11 @@ type SnowflakeJiraConnection struct {
 
 Use `gosnowflake.DSN(&gosnowflake.Config{Authenticator: gosnowflake.AuthTypeJwt, PrivateKey: ...})`. The private key PEM is stored encrypted in DevLake's connection record.
 
-Reuse `models.JiraBoard` as the scope type (board ID = Jira project PKEY, e.g. `KONFLUX`). Reuse `models.JiraScopeConfig` for type/status mapping — no new mapping logic needed.
+**Scope model — multi-project boards.** A Jira board can contain issues from multiple projects (e.g. a board tracking both DPROD and HELM). The scope unit must therefore be the **board**, not a single project PKEY. The `Options` struct should carry a `boardId` that maps to the Jira board ID, and the issue query must not filter by a single `PROJECT =` but instead use the full set of project keys associated with that board. These can be looked up from `JIRA_SPRINT.RAPID_VIEW_ID` → board association, or passed in explicitly via scope config. Reuse `models.JiraBoard` as the scope type and `models.JiraScopeConfig` for type/status mapping — no new mapping logic needed.
 
 ### Key sync queries
 
-**`sync_issues.go`** — incremental filter on `i.UPDATED > :lastSyncTime`:
+**`sync_issues.go`** — incremental filter uses DevLake's `Sync Policy` `timeRangeStart` (set per blueprint). For a full sync `timeRangeStart` is zero/null and the filter is omitted. The `WHERE` clause filters by the set of project keys belonging to the board (`:projectKeys` is an `IN` list), not a single project.
 
 ```sql
 SELECT
@@ -187,8 +183,8 @@ LEFT JOIN JIRA_DB.CLOUDRHAI_MARTS.JIRA_CUSTOMFIELDVALUE_NON_PII el
     ON el.ISSUE = i.ID AND el.CUSTOMFIELD_NAME = 'Epic Link'
 LEFT JOIN JIRA_DB.CLOUDRHAI_MARTS.JIRA_CUSTOMFIELDVALUE_NON_PII sprint_cf
     ON sprint_cf.ISSUE = i.ID AND sprint_cf.CUSTOMFIELD_NAME = 'Sprint'
-WHERE i.PROJECT = :projectKey
-  AND i.UPDATED > :lastSyncTime
+WHERE i.PROJECT IN (:projectKeys)          -- all projects on the board
+  AND i.UPDATED > :timeRangeStart          -- omitted on full sync
 ```
 
 **`sync_sprints.go`** — derive state from `STARTED`/`CLOSED` booleans:
@@ -203,7 +199,7 @@ FROM JIRA_DB.CLOUDRHAI_MARTS.JIRA_CUSTOMFIELDVALUE_NON_PII cf
 JOIN JIRA_DB.CLOUDRHAI_MARTS.JIRA_ISSUE_NON_PII i ON i.ID = cf.ISSUE
 WHERE cf.CUSTOMFIELD_NAME = 'Sprint'
   AND cf.NUMBERVALUE IS NOT NULL
-  AND i.PROJECT = :projectKey
+  AND i.PROJECT IN (:projectKeys)
 ```
 
 **`sync_changelogs.go`** — join `JIRA_CHANGELOG` and `JIRA_CHANGELOGITEM` on `GROUPID = ID`. `std_status` mapping is handled by the reused `issue_changelog_convertor.go`.
@@ -215,5 +211,6 @@ WHERE cf.CUSTOMFIELD_NAME = 'Sprint'
 - [ ] Review problem framing — does the team agree the API redundancy is worth addressing?
 - [ ] Confirm the Snowflake service account provisioning process (who owns it, key rotation policy)
 - [ ] Confirm the PII gap is acceptable for the metrics teams care about
+- [ ] **Acknowledge non-team noise gap** — filtering non-team contributors from shared Jira projects is not solvable with Snowflake data alone (all user-identifying fields are stripped). Confirm this is acceptable for the initial use cases; revisit if needed, potentially supplementing with a targeted Jira API call.
 - [ ] Agree on which project(s) to use as a pilot migration
 - [ ] Review implementation reference section for correctness before coding begins
