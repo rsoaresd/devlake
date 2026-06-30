@@ -69,12 +69,12 @@ func ConvertPullRequests(taskCtx plugin.SubTaskContext) errors.Error {
 				dal.From(&models.GithubPullRequest{}),
 				dal.Where("repo_id = ? and connection_id = ?", repoId, data.Options.ConnectionId),
 			}
-			if stateManager.IsIncremental() {
-				since := stateManager.GetSince()
-				if since != nil {
-					clauses = append(clauses, dal.Where("github_updated_at >= ?", since))
-				}
+		if stateManager.IsIncremental() {
+			since := stateManager.GetSince()
+			if since != nil {
+				clauses = append(clauses, dal.Where("updated_at >= ?", since))
 			}
+		}
 			return db.Cursor(clauses...)
 		},
 		Convert: func(pr *models.GithubPullRequest) ([]interface{}, errors.Error) {
