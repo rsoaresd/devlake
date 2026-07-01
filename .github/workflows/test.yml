@@ -32,6 +32,7 @@ on:
       - 'go.sum'
       - '.github/workflows/*.yml'
       - 'test/**'
+      - 'config-ui/**'
   schedule:
     - cron: '0 0 * * *' # run ci every night
 
@@ -74,7 +75,7 @@ jobs:
     - name: Python unit tests
       run: |
         cd backend
-        COVERAGE_OUTPUT_DIR=coverage make unit-test-python || echo "::warning::Python unit tests had failures (coverage still uploaded)"
+        COVERAGE_OUTPUT_DIR=python/coverage make unit-test-python || echo "::warning::Python unit tests had failures (coverage still uploaded)"
     - name: Install gpg for Codecov
       if: always()
       run: apt-get update -qq && apt-get install -y -qq gpg > /dev/null 2>&1
@@ -98,4 +99,30 @@ jobs:
         use_oidc: true
         flags: unit-tests-python
         directory: backend/python/coverage
+        fail_ci_if_error: false
+
+  test-config-ui:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '18'
+        cache: 'yarn'
+        cache-dependency-path: config-ui/yarn.lock
+    - name: Install dependencies
+      run: cd config-ui && yarn
+    - name: Run tests with coverage
+      run: cd config-ui && yarn test:coverage
+    - name: Upload TypeScript coverage to Codecov
+      if: always()
+      uses: codecov/codecov-action@v5
+      with:
+        use_oidc: true
+        flags: unit-tests-typescript
+        directory: config-ui/coverage
         fail_ci_if_error: false
