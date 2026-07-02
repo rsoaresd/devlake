@@ -99,27 +99,21 @@ jobs:
     - name: Collect Go e2e coverage via coverport
       if: always()
       run: |
-        mkdir -p e2e-coverage && chmod 777 e2e-coverage
-        docker run --rm \
-          --network host \
-          -v $PWD/e2e-coverage:/workspace/coverage-output \
-          quay.io/konflux-ci/konflux-devprod/coverport-cli@sha256:66a419b0759f61d7aefc3fe00fc60bbe4dc12e657f4b7b3c66d3dfb6c7bbb981 \
-          collect \
-            --url http://localhost:9095 \
-            --test-name=e2e-tests \
-            --output=/workspace/coverage-output || echo "::warning::Coverage collection failed"
+        mkdir -p e2e-coverage/raw
+        echo "Fetching coverage from coverport server..."
+        RESP=$(curl -sf http://localhost:9095/coverage) || { echo "::warning::Coverage endpoint unreachable"; exit 0; }
 
-        if ls e2e-coverage/*/e2e-tests/coverage.out 2>/dev/null; then
-          cp $(ls e2e-coverage/*/e2e-tests/coverage.out | head -1) e2e-coverage/go-coverage.out
-          echo "Go e2e coverage collected"
-          head -5 e2e-coverage/go-coverage.out
-        elif [ -f e2e-coverage/coverage.out ]; then
-          cp e2e-coverage/coverage.out e2e-coverage/go-coverage.out
-          echo "Go e2e coverage collected (flat output)"
-        else
-          echo "::warning::No coverage.out found in e2e-coverage/"
-          find e2e-coverage/ -type f 2>/dev/null || true
-        fi
+        echo "$RESP" | jq -r '.meta_filename' > /tmp/meta_name
+        echo "$RESP" | jq -r '.meta_data' | base64 -d > "e2e-coverage/raw/$(cat /tmp/meta_name)"
+        echo "$RESP" | jq -r '.counters_filename' > /tmp/counter_name
+        echo "$RESP" | jq -r '.counters_data' | base64 -d > "e2e-coverage/raw/$(cat /tmp/counter_name)"
+
+        echo "Raw coverage files:"
+        ls -la e2e-coverage/raw/
+
+        go tool covdata textfmt -i=./e2e-coverage/raw -o=./e2e-coverage/go-coverage.out
+        echo "Go e2e coverage generated:"
+        go tool cover -func=./e2e-coverage/go-coverage.out | tail -1
 
     - name: Install gpg for Codecov
       if: always()
