@@ -41,6 +41,7 @@ jobs:
       run: |
         docker compose -f docker-compose-dev.yml -f docker-compose-e2e-coverage.yml up -d --build
       env:
+        # Dummy value for CI e2e tests only — not a real credential
         ENCRYPTION_SECRET: "e2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecret"
 
     - name: Wait for API to be ready
@@ -48,7 +49,7 @@ jobs:
         echo "Waiting for DevLake API..."
         for i in $(seq 1 120); do
           if curl -s http://localhost:8080/ping > /dev/null 2>&1; then
-            echo "API ready after ${i}s"
+            echo "API ready after $((i*2))s"
             break
           fi
           sleep 2
@@ -59,14 +60,21 @@ jobs:
       run: |
         curl -s http://localhost:8080/proceed-db-migration || true
         echo "Waiting for migration to complete..."
+        migration_done=false
         for i in $(seq 1 60); do
           code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/blueprints)
-          if [ "$code" != "428" ]; then
-            echo "Migration complete (HTTP $code) after ${i}0s"
+          if [ "$code" = "200" ]; then
+            echo "Migration complete after $((i*10))s"
+            migration_done=true
             break
           fi
           sleep 10
         done
+        if [ "$migration_done" != "true" ]; then
+          echo "Migration did not complete (last HTTP $code)"
+          docker compose -f docker-compose-dev.yml -f docker-compose-e2e-coverage.yml logs devlake
+          exit 1
+        fi
 
     - name: Set up Node.js
       uses: actions/setup-node@v6
@@ -78,7 +86,7 @@ jobs:
         echo "Waiting for Config-UI..."
         for i in $(seq 1 60); do
           if curl -s http://localhost:4000 > /dev/null 2>&1; then
-            echo "Config-UI ready after ${i}s"
+            echo "Config-UI ready after $((i*2))s"
             break
           fi
           sleep 2

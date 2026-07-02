@@ -31,7 +31,7 @@ for test_dir in $(find "$SCRIPT_DIR" -path '*/.venv' -prune -o -type f -name "*_
   if [ -n "${COV_ABS_DIR:-}" ]; then
     cov_index=$((cov_index + 1))
     python_bin="$project_dir/.venv/bin/python"
-    uv pip install --python "$python_bin" pytest pytest-cov >/dev/null 2>&1
+    "$python_bin" -m pip install pytest pytest-cov
     "$python_bin" -m pytest \
       --cov="$project_dir" \
       --cov-report="xml:${COV_ABS_DIR}/coverage-${cov_index}.xml" \

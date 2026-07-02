@@ -53,7 +53,9 @@ flags:
   e2e-go:
     carryforward: true
     paths:
-      - backend/
+      - backend/plugins/aireview/
+      - backend/plugins/codecov/
+      - backend/plugins/testregistry/
 
 comment:
   layout: "reach,diff,flags,files,footer"
