@@ -50,10 +50,10 @@ flags:
     carryforward: true
     paths:
       - backend/python/
-  unit-tests-typescript:
+  e2e-go:
     carryforward: true
     paths:
-      - config-ui/src/
+      - backend/
 
 comment:
   layout: "reach,diff,flags,files,footer"

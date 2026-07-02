@@ -1,3 +1,5 @@
+//go:build coverage
+
 /*
 Licensed to the Apache Software Foundation (ASF) under one or more
 contributor license agreements.  See the NOTICE file distributed with
@@ -15,28 +17,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { defineConfig } from '@playwright/test';
+package main
 
-export default defineConfig({
-  testDir: '.',
-  testMatch: '*.spec.ts',
-  timeout: 180000,
-  expect: {
-    timeout: 10000,
-  },
-  use: {
-    baseURL: 'http://localhost:4000',
-    screenshot: 'on',
-    trace: 'on-first-retry',
-  },
-  reporter: [
-    ['list'],
-    ['html', { open: 'never' }],
-  ],
-  projects: [
-    {
-      name: 'chromium',
-      use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } },
-    },
-  ],
-});
+import _ "github.com/konflux-ci/coverport/instrumentation/go"

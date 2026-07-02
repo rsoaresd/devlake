@@ -1,0 +1,27 @@
+# E2E coverage overlay — use with:
+#   docker compose -f docker-compose-dev.yml -f docker-compose-e2e-coverage.yml up -d
+#
+# Backend: built with -cover + coverport HTTP server on port 9095.
+services:
+  mysql:
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-umerico", "-pmerico"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  devlake:
+    build:
+      context: backend
+      args:
+        DEVLAKE_COVER: "1"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "9095:9095"
+    environment:
+      COVERAGE_PORT: "9095"
+      DB_URL: mysql://merico:merico@mysql:3306/lake?charset=utf8mb4&parseTime=True&loc=UTC
+      FORCE_MIGRATION: "true"
+      AUTH_ENABLED: "false"

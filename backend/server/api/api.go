@@ -180,18 +180,13 @@ func SetupApiServer(router *gin.Engine) {
 }
 
 func RunApiServer(router *gin.Engine) {
-	// Get port from config
 	port := basicRes.GetConfig("PORT")
-	// Trim any : from the start
 	port = strings.TrimLeft(port, ":")
-	// Convert to int
 	portNum, err := strconv.Atoi(port)
 	if err != nil {
-		// Panic if PORT is not an int
 		panic(fmt.Errorf("PORT [%s] must be int: %s", port, err.Error()))
 	}
 
-	// Start the server
 	err = router.Run(fmt.Sprintf(":%d", portNum))
 	if err != nil {
 		panic(err)
