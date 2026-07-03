@@ -40,9 +40,6 @@ jobs:
     - name: Start services with coverage
       run: |
         docker compose -f docker-compose-dev.yml -f docker-compose-e2e-coverage.yml up -d --build
-      env:
-        # Dummy value for CI e2e tests only — not a real credential
-        ENCRYPTION_SECRET: "e2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecrete2etestsecret"
 
     - name: Wait for API to be ready
       run: |
