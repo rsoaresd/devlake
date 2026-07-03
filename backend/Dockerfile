@@ -163,8 +163,6 @@ COPY --from=build /app/resources /app/resources
 ENV PATH="/app/bin:${PATH}"
 ENV DEBUG="$DEBUG"
 
-RUN mkdir -p /app/covdata
-
 USER root
 RUN chgrp -R 0 /app && \
     chmod -R g=u /app
