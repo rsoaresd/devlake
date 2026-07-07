@@ -59,8 +59,8 @@ on the next nightly run.
 
 Fix: filter on `updated_at` (DB upsert timestamp), gated on `IsIncremental()`.
 
-**Upstream status:** N/A
-**Upstream PR:** N/A
+**Upstream status:** TO DO
+**Upstream PR:** none yet
 **Owner:** @rsoaresd
 
 **Rebase notes:** Watch for upstream changes to `ConvertPullRequests()` input clause logic.
