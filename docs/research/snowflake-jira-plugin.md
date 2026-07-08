@@ -132,7 +132,7 @@ import jiratasks "github.com/apache/incubator-devlake/backend/plugins/jira/tasks
 jiratasks.ConvertBoardMeta,
 jiratasks.ConvertIssuesMeta,
 jiratasks.ConvertIssueLabelsMeta,
-jiratasks.ConvertIssueCommentsMeta,
+// ConvertIssueCommentsMeta: omit — no JIRA_COMMENT table available in Snowflake; also EnabledByDefault: false
 jiratasks.ConvertWorklogsMeta,
 jiratasks.ConvertIssueChangelogsMeta,
 jiratasks.ConvertIssueRelationshipsMeta,
