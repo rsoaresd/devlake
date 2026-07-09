@@ -3,8 +3,11 @@
 This file tracks modifications to files originating from [apache/incubator-devlake](https://github.com/apache/incubator-devlake)
 that must be maintained during upstream syncs.
 
-Owned plugins (`aireview`, `codecov`, `testregistry`, `agentready`, `langfuse`) are additions,
+Owned plugins (`aireview`, `codecov`, `testregistry`, `agentready`, `langfuse`, `jira_snowflake`) are additions,
 not modifications, and are not tracked here.
+
+`jira_snowflake/tasks/convert_*.go` are adapted copies of `jira/tasks/` convertors — see the
+[jira_snowflake AGENTS.md](../backend/plugins/jira_snowflake/AGENTS.md) for the diff details.
 
 ## gitextractor: ForceFullClone / FORCE_FULL_GIT_HISTORY
 
