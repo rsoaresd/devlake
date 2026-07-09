@@ -66,19 +66,29 @@ tasks/convert_*.go        — domain-layer convertors (adapted copies of jira/ta
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `JIRA_ISSUE_NON_PII` | `ID, ISSUE_KEY, PROJECT, ISSUETYPE, ISSUESTATUS_ID, SUMMARY, DESCRIPTION, PARENT_ID, TIMEORIGINALESTIMATE, TIMEESTIMATE, TIMESPENT, CREATED, UPDATED, RESOLUTIONDATE, DUEDATE` | No `SUBTASK_FLAG`; use `JIRA_ISSUETYPE_RHAI.PSTYLE = 'subtask'` instead. `TIMEESTIMATE` and `DESCRIPTION` can be NULL. |
+| `JIRA_ISSUE_NON_PII` | `ID, ISSUE_KEY, PROJECT, ISSUETYPE, ISSUESTATUS_ID, SUMMARY, DESCRIPTION, PARENT_ID, TIMEORIGINALESTIMATE, TIMEESTIMATE, TIMESPENT, CREATED, UPDATED, RESOLUTIONDATE, DUEDATE, PRIORITY, COMPONENT, FIXFOR` | No `SUBTASK_FLAG`; use `JIRA_ISSUETYPE_RHAI.PSTYLE = 'subtask'` instead. `TIMEESTIMATE`, `DESCRIPTION`, `COMPONENT`, and `FIXFOR` can be NULL. `PRIORITY` stores a numeric Jira priority ID, not a human-readable name. |
 | `JIRA_ISSUESTATUS_RHAI` | `ID, PNAME, STATUSCATEGORY` | `STATUSCATEGORY` is a numeric string (`'2'`/`'3'`/`'4'`), not a text label. |
 | `JIRA_ISSUETYPE_RHAI` | `ID, PNAME, PSTYLE` | `PSTYLE = 'subtask'` marks subtask types; can be NULL for normal types. |
 | `JIRA_PROJECT_RHAI` | `ID, PNAME, PKEY` | Join via `i.PROJECT = p.PKEY`. |
 | `JIRA_CUSTOMFIELDVALUE_NON_PII` | `ID, CUSTOMFIELD_NAME, ISSUE, NUMBERVALUE, STRINGVALUE` | `NUMBERVALUE` is `NUMBER(38,0)` — use `::FLOAT` / `::BIGINT` cast, not `TRY_CAST`. |
+| `JIRA_COMPONENT_RHAI` | `ID, PROJECT, CNAME` | Component name lookup. However `JIRA_ISSUE_NON_PII.COMPONENT` is always NULL (see limitations below). |
 | `JIRA_CHANGEGROUP_RHAI_CLUSTERED` | `ID, ISSUEID, CREATED` | Replaces `JIRA_CHANGELOG`. No author column (PII-stripped). |
 | `JIRA_CHANGEITEM_NON_PII_CLUSTERED` | `ID, GROUPID, FIELD, FIELDTYPE, OLDVALUE, NEWVALUE` | Replaces `JIRA_CHANGELOGITEM`. No `FIELDID`, `OLDSTRING`, `NEWSTRING` columns. |
 
 **Not available** in this schema (Fivetran PII policy or not replicated):
-`JIRA_SPRINT`, `JIRA_WORKLOG`, `JIRA_LABEL`, `JIRA_ISSUELINK`, `JIRA_ISSUELINKTYPE`
+`JIRA_SPRINT`, `JIRA_WORKLOG`, `JIRA_LABEL`, `JIRA_ISSUELINK`, `JIRA_ISSUELINKTYPE`,
+`JIRA_PRIORITY_RHAI` (priority name lookup), `JIRA_VERSION_RHAI` (fix-version name lookup)
 
 Therefore only these subtasks produce data: `syncIssues`, `syncChangelogs`, and their convertors.
 The remaining sync subtasks (`syncSprints`, `syncSprintIssues`, `syncWorklogs`, `syncLabels`, `syncIssueLinks`) will fail if enabled.
+
+**Known field limitations (verified 2026-07-09):**
+
+| Field | Status | Reason |
+|---|---|---|
+| `priority_name` | Numeric Jira priority ID (e.g. `10001`) — not a name | `JIRA_PRIORITY_RHAI` not replicated by Fivetran; no name lookup available |
+| `components` | Always empty | `JIRA_ISSUE_NON_PII.COMPONENT` is always NULL; issue-to-component is a many-to-many relation not stored on the issue row |
+| `fix_versions` | Always empty | `JIRA_ISSUE_NON_PII.FIXFOR` is always NULL; `JIRA_VERSION_RHAI` not replicated by Fivetran |
 
 ## Jira plugin models dependency
 

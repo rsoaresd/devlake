@@ -88,6 +88,9 @@ func SyncIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 		epicKey                  *string
 		sprintId                 *uint64
 		isSubtask                bool
+		priorityName             *string
+		components               *string
+		fixVersions              *string
 	)
 		if scanErr := rows.Scan(
 			&issueId, &issueKey, &projectId, &projectKey, &projectName,
@@ -96,6 +99,7 @@ func SyncIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 			&created, &updated, &resolutionDate, &dueDate,
 			&parentId, &originalEstimateSeconds, &remainingEstimateSeconds,
 			&timeSpentSeconds, &storyPoint, &epicKey, &sprintId, &isSubtask,
+			&priorityName, &components, &fixVersions,
 		); scanErr != nil {
 			return errors.Default.Wrap(scanErr, "failed to scan Snowflake issue row")
 		}
@@ -129,6 +133,9 @@ func SyncIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 			StdStatus:    stdStatus,
 			StoryPoint:   storyPoint,
 			EpicKey:      stringVal(epicKey),
+			PriorityName: stringVal(priorityName),
+			Components:   stringVal(components),
+			FixVersions:  stringVal(fixVersions),
 			Created:      created,
 			Updated:      updated,
 			Subtask:      isSubtask,
@@ -221,7 +228,10 @@ SELECT
     sp.NUMBERVALUE::FLOAT                                   AS story_point,
     el.STRINGVALUE                                          AS epic_key,
     sprint_cf.NUMBERVALUE::BIGINT                          AS sprint_id,
-    COALESCE(it.PSTYLE = 'subtask', FALSE)                  AS is_subtask
+    COALESCE(it.PSTYLE = 'subtask', FALSE)                  AS is_subtask,
+    i.PRIORITY                                              AS priority_name,
+    i.COMPONENT                                             AS components,
+    i.FIXFOR                                                AS fix_versions
 FROM JIRA_ISSUE_NON_PII i
 JOIN JIRA_ISSUETYPE_RHAI   it      ON i.ISSUETYPE      = it.ID
 JOIN JIRA_ISSUESTATUS_RHAI s       ON i.ISSUESTATUS_ID  = s.ID

@@ -63,6 +63,7 @@ func TestBuildIssuesQuery_ContainsRequiredColumns(t *testing.T) {
 		"issue_id", "ISSUE_KEY", "issue_type", "status_key",
 		"SUMMARY", "CREATED", "UPDATED",
 		"STATUSCATEGORY", "story_point", "is_subtask",
+		"priority_name", "components", "fix_versions",
 	} {
 		assert.True(t, strings.Contains(q, col), "query must contain column %q", col)
 	}
