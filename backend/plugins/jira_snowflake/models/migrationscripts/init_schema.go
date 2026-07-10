@@ -30,13 +30,13 @@ type initSchema struct{}
 // AuthType was not yet present; it was added by the 20260709000001 migration.
 type snowflakeJiraConnection20260708 struct {
 	helper.BaseConnection `mapstructure:",squash"`
-	Account    string `gorm:"column:account;not null"`
-	User       string `gorm:"column:sf_user;not null"`
-	PrivateKey string `gorm:"column:private_key"`
-	Database   string `gorm:"column:sf_database;not null"`
-	Schema     string `gorm:"column:sf_schema;not null"`
-	Warehouse  string `gorm:"column:warehouse"`
-	Role       string `gorm:"column:sf_role"`
+	Account               string `gorm:"column:account;not null"`
+	User                  string `gorm:"column:sf_user;not null"`
+	PrivateKey            string `gorm:"column:private_key"`
+	Database              string `gorm:"column:sf_database;not null"`
+	Schema                string `gorm:"column:sf_schema;not null"`
+	Warehouse             string `gorm:"column:warehouse"`
+	Role                  string `gorm:"column:sf_role"`
 }
 
 func (snowflakeJiraConnection20260708) TableName() string {

@@ -32,14 +32,14 @@ type addAuthType struct{}
 // Adds AuthType compared to the 20260708 snapshot.
 type snowflakeJiraConnection20260709 struct {
 	helper.BaseConnection `mapstructure:",squash"`
-	Account    string `gorm:"column:account;not null"`
-	User       string `gorm:"column:sf_user;not null"`
-	AuthType   string `gorm:"column:auth_type;default:keypair"`
-	PrivateKey string `gorm:"column:private_key"`
-	Database   string `gorm:"column:sf_database;not null"`
-	Schema     string `gorm:"column:sf_schema;not null"`
-	Warehouse  string `gorm:"column:warehouse"`
-	Role       string `gorm:"column:sf_role"`
+	Account               string `gorm:"column:account;not null"`
+	User                  string `gorm:"column:sf_user;not null"`
+	AuthType              string `gorm:"column:auth_type;default:keypair"`
+	PrivateKey            string `gorm:"column:private_key"`
+	Database              string `gorm:"column:sf_database;not null"`
+	Schema                string `gorm:"column:sf_schema;not null"`
+	Warehouse             string `gorm:"column:warehouse"`
+	Role                  string `gorm:"column:sf_role"`
 }
 
 func (snowflakeJiraConnection20260709) TableName() string {
