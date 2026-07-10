@@ -19,7 +19,6 @@ package tasks
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/errors"
@@ -44,11 +43,7 @@ func SyncSprints(subtaskCtx plugin.SubTaskContext) errors.Error {
 	boardId := data.Options.BoardId
 	projectKeys := data.Options.ProjectKeys
 
-	placeholders := make([]string, len(projectKeys))
-	for i, k := range projectKeys {
-		placeholders[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(k, "'", "''"))
-	}
-	projectList := strings.Join(placeholders, ", ")
+	inClause, args := buildProjectInClause(projectKeys)
 
 	// Select distinct sprints associated with issues in the board's projects.
 	// State is derived from STARTED/CLOSED booleans.
@@ -70,10 +65,10 @@ JOIN JIRA_CUSTOMFIELDVALUE_NON_PII cf
     ON cf.CUSTOMFIELD_NAME = 'Sprint'
     AND TRY_CAST(cf.NUMBERVALUE AS BIGINT) = sp.ID
 JOIN JIRA_ISSUE_NON_PII i ON i.ID = cf.ISSUE
-WHERE i.PROJECT IN (%s)
-`, projectList)
+WHERE i.PROJECT IN %s
+`, inClause)
 
-	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query)
+	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {
 		return errors.Default.Wrap(goErr, "failed to query Snowflake for sprints")
 	}

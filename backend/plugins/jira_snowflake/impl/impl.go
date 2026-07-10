@@ -66,9 +66,13 @@ func (p JiraSnowflake) ScopeConfig() dal.Tabler {
 }
 
 func (p JiraSnowflake) Init(basicRes context.BasicRes) errors.Error {
-	// Register a jira stub so didgen can resolve jira/models types without
-	// requiring the jira plugin to be deployed alongside jira_snowflake.
-	_ = plugin.RegisterPlugin("jira", jiraPluginStub{})
+	// Only register the jira stub when the real jira plugin is absent.
+	// If both plugins are deployed in the same instance, the real registration
+	// must take precedence — overwriting it with this stub would break jira
+	// API routing, task execution, and didgen resolution for all jira connections.
+	if _, err := plugin.GetPlugin("jira"); err != nil {
+		_ = plugin.RegisterPlugin("jira", jiraPluginStub{})
+	}
 	api.Init(basicRes, p)
 	return nil
 }
@@ -138,7 +142,7 @@ func (p JiraSnowflake) PrepareTaskData(taskCtx plugin.TaskContext, options map[s
 	dbErr := taskCtx.GetDal().First(board, dal.Where("connection_id = ? AND board_id = ?", op.ConnectionId, op.BoardId))
 	if dbErr != nil && taskCtx.GetDal().IsErrorNotFound(dbErr) {
 		board = &jiramodels.JiraBoard{
-			Scope: coremodels.Scope{ConnectionId: op.ConnectionId},
+			Scope:   coremodels.Scope{ConnectionId: op.ConnectionId},
 			BoardId: op.BoardId,
 			Name:    "Snowflake Board",
 		}

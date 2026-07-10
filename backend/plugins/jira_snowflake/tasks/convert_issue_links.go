@@ -35,7 +35,7 @@ import (
 var ConvertIssueRelationshipsMeta = plugin.SubTaskMeta{
 	Name:             "convertIssueRelationships",
 	EntryPoint:       ConvertIssueRelationships,
-	EnabledByDefault: true,
+	EnabledByDefault: false,
 	Description:      "Convert Jira issue relationships into domain layer ticket.IssueRelationship",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }

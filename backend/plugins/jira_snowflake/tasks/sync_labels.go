@@ -19,7 +19,6 @@ package tasks
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -42,11 +41,7 @@ func SyncLabels(subtaskCtx plugin.SubTaskContext) errors.Error {
 	connectionId := data.Options.ConnectionId
 	projectKeys := data.Options.ProjectKeys
 
-	placeholders := make([]string, len(projectKeys))
-	for i, k := range projectKeys {
-		placeholders[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(k, "'", "''"))
-	}
-	projectList := strings.Join(placeholders, ", ")
+	inClause, args := buildProjectInClause(projectKeys)
 
 	query := fmt.Sprintf(`
 SELECT
@@ -54,10 +49,10 @@ SELECT
     l.LABELNAME AS label_name
 FROM JIRA_LABEL l
 JOIN JIRA_ISSUE_NON_PII i ON i.ID = l.ISSUE
-WHERE i.PROJECT IN (%s)
-`, projectList)
+WHERE i.PROJECT IN %s
+`, inClause)
 
-	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query)
+	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {
 		return errors.Default.Wrap(goErr, "failed to query Snowflake for labels")
 	}

@@ -76,7 +76,6 @@ func ConvertChangelogs(subtaskCtx plugin.SubTaskContext) errors.Error {
 	changelogIdGen := didgen.NewDomainIdGenerator(&jiramodels.JiraIssueChangelogItems{})
 	accountIdGen := didgen.NewDomainIdGenerator(&jiramodels.JiraAccount{})
 
-	var convErr errors.Error
 	converter, err := helper.NewStatefulDataConverter(&helper.StatefulDataConverterArgs[issueChangelogItemResult]{
 		SubtaskCommonArgs: &helper.SubtaskCommonArgs{
 			SubTaskContext: subtaskCtx,
@@ -156,7 +155,6 @@ func ConvertChangelogs(subtaskCtx plugin.SubTaskContext) errors.Error {
 	if err != nil {
 		return err
 	}
-	_ = convErr
 	return converter.Execute()
 }
 

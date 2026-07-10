@@ -55,9 +55,9 @@ func SyncIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 		timeAfter = syncPolicy.TimeAfter
 	}
 
-	query := buildIssuesQuery(projectKeys, timeAfter)
+	query, args := buildIssuesQuery(projectKeys, timeAfter)
 
-	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query)
+	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {
 		return errors.Default.Wrap(goErr, "failed to query Snowflake for issues")
 	}
@@ -66,32 +66,32 @@ func SyncIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 	count := 0
 	for rows.Next() {
 		var (
-			issueId                 uint64
-		issueKey                 string
-		projectId                uint64
-		projectKey               string
-		projectName              string
-		issueType                string
-		statusName               string
-		statusKey                string
-		summary                  *string
-		description              *string
-		created                  time.Time
-		updated                  time.Time
-		resolutionDate           *time.Time
-		dueDate                  *time.Time
-		parentId                 *uint64
-		originalEstimateSeconds  *int64
-		remainingEstimateSeconds *int64
-		timeSpentSeconds         *int64
-		storyPoint               *float64
-		epicKey                  *string
-		sprintId                 *uint64
-		isSubtask                bool
-		priorityName             *string
-		components               *string
-		fixVersions              *string
-	)
+			issueId                  uint64
+			issueKey                 string
+			projectId                uint64
+			projectKey               string
+			projectName              string
+			issueType                string
+			statusName               string
+			statusKey                string
+			summary                  *string
+			description              *string
+			created                  time.Time
+			updated                  time.Time
+			resolutionDate           *time.Time
+			dueDate                  *time.Time
+			parentId                 *uint64
+			originalEstimateSeconds  *int64
+			remainingEstimateSeconds *int64
+			timeSpentSeconds         *int64
+			storyPoint               *float64
+			epicKey                  *string
+			sprintId                 *uint64
+			isSubtask                bool
+			priorityName             *string
+			components               *string
+			fixVersions              *string
+		)
 		if scanErr := rows.Scan(
 			&issueId, &issueKey, &projectId, &projectKey, &projectName,
 			&issueType, &statusName, &statusKey,
@@ -187,21 +187,19 @@ func SyncIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 	return nil
 }
 
-// buildIssuesQuery constructs the Snowflake SELECT for issues.
+// buildIssuesQuery constructs the parameterized Snowflake SELECT for issues.
+// Returns the query template (with ? placeholders) and the bound arguments.
 // Extracted as a pure function so it can be unit-tested independently of the DB.
-func buildIssuesQuery(projectKeys []string, timeAfter *time.Time) string {
-	placeholders := make([]string, len(projectKeys))
-	for i, k := range projectKeys {
-		placeholders[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(k, "'", "''"))
-	}
-	projectList := strings.Join(placeholders, ", ")
+func buildIssuesQuery(projectKeys []string, timeAfter *time.Time) (string, []interface{}) {
+	inClause, args := buildProjectInClause(projectKeys)
 
-	var timeFilter string
+	timeFilter := ""
 	if timeAfter != nil {
-		timeFilter = fmt.Sprintf("AND i.UPDATED > '%s'", timeAfter.UTC().Format(time.RFC3339))
+		timeFilter = "AND i.UPDATED > ?"
+		args = append(args, *timeAfter)
 	}
 
-	return fmt.Sprintf(`
+	query := fmt.Sprintf(`
 SELECT
     i.ID                                                    AS issue_id,
     i.ISSUE_KEY,
@@ -242,14 +240,15 @@ LEFT JOIN JIRA_CUSTOMFIELDVALUE_NON_PII el
     ON el.ISSUE = i.ID AND el.CUSTOMFIELD_NAME = 'Epic Link'
 LEFT JOIN JIRA_CUSTOMFIELDVALUE_NON_PII sprint_cf
     ON sprint_cf.ISSUE = i.ID AND sprint_cf.CUSTOMFIELD_NAME = 'Sprint'
-WHERE i.PROJECT IN (%s)
+WHERE i.PROJECT IN %s
 %s
 QUALIFY ROW_NUMBER() OVER (
     PARTITION BY i.ID
     ORDER BY sprint_cf.NUMBERVALUE DESC NULLS LAST,
              sp.NUMBERVALUE         DESC NULLS LAST
 ) = 1
-`, projectList, timeFilter)
+`, inClause, timeFilter)
+	return query, args
 }
 
 func stringVal(s *string) string {

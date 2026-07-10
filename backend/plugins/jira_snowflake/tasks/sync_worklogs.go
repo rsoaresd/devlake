@@ -19,7 +19,6 @@ package tasks
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/errors"
@@ -43,16 +42,12 @@ func SyncWorklogs(subtaskCtx plugin.SubTaskContext) errors.Error {
 	connectionId := data.Options.ConnectionId
 	projectKeys := data.Options.ProjectKeys
 
-	placeholders := make([]string, len(projectKeys))
-	for i, k := range projectKeys {
-		placeholders[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(k, "'", "''"))
-	}
-	projectList := strings.Join(placeholders, ", ")
-
-	var timeFilter string
+	inClause, args := buildProjectInClause(projectKeys)
 	syncPolicy := subtaskCtx.TaskContext().SyncPolicy()
+	timeFilter := ""
 	if syncPolicy != nil && syncPolicy.TimeAfter != nil {
-		timeFilter = fmt.Sprintf("AND w.UPDATED > '%s'", syncPolicy.TimeAfter.UTC().Format(time.RFC3339))
+		timeFilter = "AND w.UPDATED > ?"
+		args = append(args, *syncPolicy.TimeAfter)
 	}
 
 	// TIMEWORKED is in seconds — store directly into TimeSpentSeconds.
@@ -67,11 +62,11 @@ SELECT
     w.UPDATED
 FROM JIRA_WORKLOG w
 JOIN JIRA_ISSUE_NON_PII i ON i.ID = w.ISSUEID
-WHERE i.PROJECT IN (%s)
+WHERE i.PROJECT IN %s
 %s
-`, projectList, timeFilter)
+`, inClause, timeFilter)
 
-	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query)
+	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {
 		return errors.Default.Wrap(goErr, "failed to query Snowflake for worklogs")
 	}

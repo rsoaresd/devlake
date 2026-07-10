@@ -30,6 +30,19 @@ import (
 	jiramodels "github.com/apache/incubator-devlake/plugins/jira/models"
 )
 
+// buildProjectInClause builds a parameterized IN clause fragment "(?, ?, ...)"
+// and the corresponding argument slice for the given project keys.
+// Usage: clause, args := buildProjectInClause(keys); db.QueryContext(ctx, "...IN "+clause, args...)
+func buildProjectInClause(projectKeys []string) (string, []interface{}) {
+	placeholders := make([]string, len(projectKeys))
+	args := make([]interface{}, len(projectKeys))
+	for i, k := range projectKeys {
+		placeholders[i] = "?"
+		args[i] = k
+	}
+	return "(" + strings.Join(placeholders, ", ") + ")", args
+}
+
 // getStdStatus maps a Jira status category key to a DevLake standard status.
 // Copied from plugins/jira/tasks/shared.go.
 func getStdStatus(statusKey string) string {

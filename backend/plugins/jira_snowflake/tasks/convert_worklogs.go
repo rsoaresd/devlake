@@ -36,7 +36,7 @@ import (
 var ConvertWorklogsMeta = plugin.SubTaskMeta{
 	Name:             "convertWorklogs",
 	EntryPoint:       ConvertWorklogs,
-	EnabledByDefault: true,
+	EnabledByDefault: false,
 	Description:      "Convert Jira worklogs into domain layer ticket.IssueWorklog",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }

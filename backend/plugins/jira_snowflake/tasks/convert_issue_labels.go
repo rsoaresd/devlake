@@ -35,7 +35,7 @@ import (
 var ConvertIssueLabelsMeta = plugin.SubTaskMeta{
 	Name:             "convertIssueLabels",
 	EntryPoint:       ConvertIssueLabels,
-	EnabledByDefault: true,
+	EnabledByDefault: false,
 	Description:      "Convert Jira issue labels into domain layer ticket.IssueLabel",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }

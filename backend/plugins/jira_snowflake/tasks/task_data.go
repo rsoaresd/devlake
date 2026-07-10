@@ -32,8 +32,8 @@ import (
 
 // JiraSnowflakeOptions contains all per-pipeline task options.
 type JiraSnowflakeOptions struct {
-	ConnectionId  uint64                      `json:"connectionId"  mapstructure:"connectionId"`
-	BoardId       uint64                      `json:"boardId"       mapstructure:"boardId"`
+	ConnectionId uint64 `json:"connectionId"  mapstructure:"connectionId"`
+	BoardId      uint64 `json:"boardId"       mapstructure:"boardId"`
 	// ProjectKeys lists all Jira project keys that belong to this board,
 	// e.g. ["KONFLUX", "HELM"]. Required because a board may span multiple projects.
 	ProjectKeys   []string                    `json:"projectKeys"   mapstructure:"projectKeys"`
@@ -80,10 +80,10 @@ func DecodeAndValidateTaskOptions(options map[string]interface{}) (*JiraSnowflak
 //     (i.e. via `make run`, not inside a Docker container).
 func OpenSnowflakeDB(account, user, authType, privateKeyPEM, database, schema, warehouse, role string) (*sql.DB, errors.Error) {
 	cfg := &sf.Config{
-		Account:   account,
-		User:      user,
-		Database:  database,
-		Schema:    schema,
+		Account:  account,
+		User:     user,
+		Database: database,
+		Schema:   schema,
 	}
 	if warehouse != "" {
 		cfg.Warehouse = warehouse

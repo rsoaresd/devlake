@@ -35,7 +35,7 @@ import (
 var ConvertSprintIssuesMeta = plugin.SubTaskMeta{
 	Name:             "convertSprintIssues",
 	EntryPoint:       ConvertSprintIssues,
-	EnabledByDefault: true,
+	EnabledByDefault: false,
 	Description:      "Convert Jira sprint-issue memberships into domain layer ticket.SprintIssue",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }

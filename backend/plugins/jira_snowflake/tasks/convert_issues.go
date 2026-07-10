@@ -158,6 +158,14 @@ func ConvertIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 	// Full-sync deletion: since there is no raw-table layer, we cannot use
 	// the _raw_data_table-based deletion from the upstream jira convertor.
 	// Instead we delete domain rows scoped to this board's domain ID.
+	//
+	// Trade-off: deletion happens before conversion rather than after. If the
+	// converter fails partway through, previously synced domain data is lost
+	// until the next successful full sync. The alternative (delete after) is
+	// unsafe here because converter.Execute() upserts rows with the same
+	// _raw_data_params scope, so a post-convert delete would erase the freshly
+	// written data. Acceptable given that full-sync is an admin-triggered operation
+	// and re-running it is straightforward.
 	if !converter.IsIncremental() {
 		logger.Debug("deleting outdated domain rows for board %d", data.Options.BoardId)
 		if dbErr := db.Delete(&ticket.Issue{}, dal.Where("_raw_data_params = ?", converter.GetRawDataParams())); dbErr != nil {

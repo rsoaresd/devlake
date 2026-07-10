@@ -30,35 +30,35 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestBuildIssuesQuery_SingleProject(t *testing.T) {
-	q := buildIssuesQuery([]string{"KONFLUX"}, nil)
-	assert.Contains(t, q, "WHERE i.PROJECT IN ('KONFLUX')")
+	q, args := buildIssuesQuery([]string{"KONFLUX"}, nil)
+	assert.Contains(t, q, "WHERE i.PROJECT IN (?)")
+	assert.Equal(t, []interface{}{"KONFLUX"}, args)
 	assert.NotContains(t, q, "i.UPDATED >", "no time filter expected for nil timeAfter")
 }
 
 func TestBuildIssuesQuery_MultipleProjects(t *testing.T) {
-	q := buildIssuesQuery([]string{"PROJ1", "PROJ2", "PROJ3"}, nil)
-	assert.Contains(t, q, "'PROJ1'")
-	assert.Contains(t, q, "'PROJ2'")
-	assert.Contains(t, q, "'PROJ3'")
-	// All three should appear in a single IN clause
-	assert.Contains(t, q, "IN ('PROJ1', 'PROJ2', 'PROJ3')")
+	q, args := buildIssuesQuery([]string{"PROJ1", "PROJ2", "PROJ3"}, nil)
+	assert.Contains(t, q, "IN (?, ?, ?)")
+	assert.Equal(t, []interface{}{"PROJ1", "PROJ2", "PROJ3"}, args)
 }
 
-func TestBuildIssuesQuery_ProjectKeyWithSingleQuote(t *testing.T) {
-	// A project key containing a single quote must be double-escaped.
-	q := buildIssuesQuery([]string{"O'TOOL"}, nil)
-	assert.Contains(t, q, "'O''TOOL'", "single quote in project key must be escaped as ''")
-	assert.NotContains(t, q, "'O'TOOL'", "unescaped single quote would break SQL")
+func TestBuildIssuesQuery_ProjectKeyPassedAsArg(t *testing.T) {
+	// Project keys with special characters are passed as bound args, not interpolated.
+	_, args := buildIssuesQuery([]string{"O'TOOL"}, nil)
+	assert.Equal(t, []interface{}{"O'TOOL"}, args, "project key must be passed as a bound arg, not interpolated")
 }
 
 func TestBuildIssuesQuery_WithTimeFilter(t *testing.T) {
 	ts := time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)
-	q := buildIssuesQuery([]string{"PROJ"}, &ts)
-	assert.Contains(t, q, "i.UPDATED > '2025-06-01T12:00:00Z'")
+	q, args := buildIssuesQuery([]string{"PROJ"}, &ts)
+	assert.Contains(t, q, "AND i.UPDATED > ?")
+	assert.Equal(t, 2, len(args), "should have project key arg + time arg")
+	assert.Equal(t, "PROJ", args[0])
+	assert.Equal(t, ts, args[1])
 }
 
 func TestBuildIssuesQuery_ContainsRequiredColumns(t *testing.T) {
-	q := buildIssuesQuery([]string{"PROJ"}, nil)
+	q, _ := buildIssuesQuery([]string{"PROJ"}, nil)
 	for _, col := range []string{
 		"issue_id", "ISSUE_KEY", "issue_type", "status_key",
 		"SUMMARY", "CREATED", "UPDATED",
@@ -70,7 +70,7 @@ func TestBuildIssuesQuery_ContainsRequiredColumns(t *testing.T) {
 }
 
 func TestBuildIssuesQuery_StatusCategoryMapping(t *testing.T) {
-	q := buildIssuesQuery([]string{"PROJ"}, nil)
+	q, _ := buildIssuesQuery([]string{"PROJ"}, nil)
 	// STATUSCATEGORY stores numeric IDs as strings: '2'=new, '3'=in_progress, '4'=done
 	assert.Contains(t, q, "WHEN '2' THEN 'new'")
 	assert.Contains(t, q, "WHEN '4' THEN 'done'")
@@ -80,7 +80,7 @@ func TestBuildIssuesQuery_StatusCategoryMapping(t *testing.T) {
 
 func TestBuildIssuesQuery_ContainsQUALIFY(t *testing.T) {
 	// QUALIFY deduplicates issues that appear in multiple sprints
-	q := buildIssuesQuery([]string{"PROJ"}, nil)
+	q, _ := buildIssuesQuery([]string{"PROJ"}, nil)
 	assert.Contains(t, q, "QUALIFY ROW_NUMBER() OVER")
 	assert.Contains(t, q, "PARTITION BY i.ID")
 }

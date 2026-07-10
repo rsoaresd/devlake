@@ -45,6 +45,8 @@ func TestMain(m *testing.M) {
 // JiraSnowflake is a minimal PluginMeta stub for jira_snowflake model types.
 type JiraSnowflake struct{}
 
-func (JiraSnowflake) Name() string        { return "jira_snowflake" }
-func (JiraSnowflake) RootPkgPath() string { return "github.com/apache/incubator-devlake/plugins/jira_snowflake" }
+func (JiraSnowflake) Name() string { return "jira_snowflake" }
+func (JiraSnowflake) RootPkgPath() string {
+	return "github.com/apache/incubator-devlake/plugins/jira_snowflake"
+}
 func (JiraSnowflake) Description() string { return "" }

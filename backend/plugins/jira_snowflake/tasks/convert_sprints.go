@@ -37,7 +37,7 @@ import (
 var ConvertSprintsMeta = plugin.SubTaskMeta{
 	Name:             "convertSprints",
 	EntryPoint:       ConvertSprints,
-	EnabledByDefault: true,
+	EnabledByDefault: false,
 	Description:      "Convert Jira sprints into domain layer ticket.Sprint",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
