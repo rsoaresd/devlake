@@ -43,7 +43,7 @@ func SyncIssueLinks(subtaskCtx plugin.SubTaskContext) errors.Error {
 
 	inClause, args := buildProjectInClause(projectKeys)
 
-	query := fmt.Sprintf(`
+	const queryTmpl = `
 SELECT
     il.ID               AS link_id,
     il.SOURCE           AS issue_id,
@@ -59,7 +59,8 @@ JOIN JIRA_ISSUE_NON_PII src ON src.ID = il.SOURCE
 JOIN JIRA_ISSUE_NON_PII dst ON dst.ID = il.DESTINATION
 JOIN JIRA_ISSUELINKTYPE lt   ON lt.ID = il.LINKTYPE
 WHERE src.PROJECT IN %s
-`, inClause)
+`
+	query := fmt.Sprintf(queryTmpl, inClause) //nolint:gosec // G201: inClause contains only '?' placeholders from buildProjectInClause; no user data is interpolated
 
 	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {

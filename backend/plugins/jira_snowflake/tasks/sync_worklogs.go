@@ -53,7 +53,7 @@ func SyncWorklogs(subtaskCtx plugin.SubTaskContext) errors.Error {
 	// TIMEWORKED is in seconds — store directly into TimeSpentSeconds.
 	// The worklog convertor (convert_worklogs.go) divides by 60 when writing to the domain layer.
 	// Assignee/author fields are null (PII stripped in Snowflake).
-	query := fmt.Sprintf(`
+	const queryTmpl = `
 SELECT
     TO_VARCHAR(w.ID)    AS worklog_id,
     w.ISSUEID           AS issue_id,
@@ -64,7 +64,8 @@ FROM JIRA_WORKLOG w
 JOIN JIRA_ISSUE_NON_PII i ON i.ID = w.ISSUEID
 WHERE i.PROJECT IN %s
 %s
-`, inClause, timeFilter)
+`
+	query := fmt.Sprintf(queryTmpl, inClause, timeFilter) //nolint:gosec // G201: inClause contains only '?' placeholders from buildProjectInClause; timeFilter is a static string
 
 	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {

@@ -43,14 +43,15 @@ func SyncLabels(subtaskCtx plugin.SubTaskContext) errors.Error {
 
 	inClause, args := buildProjectInClause(projectKeys)
 
-	query := fmt.Sprintf(`
+	const queryTmpl = `
 SELECT
     l.ISSUE     AS issue_id,
     l.LABELNAME AS label_name
 FROM JIRA_LABEL l
 JOIN JIRA_ISSUE_NON_PII i ON i.ID = l.ISSUE
 WHERE i.PROJECT IN %s
-`, inClause)
+`
+	query := fmt.Sprintf(queryTmpl, inClause) //nolint:gosec // G201: inClause contains only '?' placeholders from buildProjectInClause; no user data is interpolated
 
 	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {

@@ -61,7 +61,7 @@ func SyncChangelogs(subtaskCtx plugin.SubTaskContext) errors.Error {
 		args = append(args, *syncPolicy.TimeAfter)
 	}
 
-	query := fmt.Sprintf(`
+	const queryTmpl = `
 SELECT
     cl.ID                   AS changelog_id,
     cl.ISSUEID              AS issue_id,
@@ -78,7 +78,8 @@ JOIN JIRA_CHANGEITEM_NON_PII_CLUSTERED ci ON ci.GROUPID = cl.ID
 JOIN JIRA_ISSUE_NON_PII i                 ON i.ID = cl.ISSUEID
 WHERE i.PROJECT IN %s
 %s
-`, inClause, timeFilter)
+`
+	query := fmt.Sprintf(queryTmpl, inClause, timeFilter) //nolint:gosec // G201: inClause contains only '?' placeholders from buildProjectInClause; timeFilter is a static string
 
 	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {

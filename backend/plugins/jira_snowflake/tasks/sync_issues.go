@@ -199,7 +199,7 @@ func buildIssuesQuery(projectKeys []string, timeAfter *time.Time) (string, []int
 		args = append(args, *timeAfter)
 	}
 
-	query := fmt.Sprintf(`
+	const queryTmpl = `
 SELECT
     i.ID                                                    AS issue_id,
     i.ISSUE_KEY,
@@ -247,7 +247,8 @@ QUALIFY ROW_NUMBER() OVER (
     ORDER BY sprint_cf.NUMBERVALUE DESC NULLS LAST,
              sp.NUMBERVALUE         DESC NULLS LAST
 ) = 1
-`, inClause, timeFilter)
+`
+	query := fmt.Sprintf(queryTmpl, inClause, timeFilter) //nolint:gosec // G201: inClause contains only '?' placeholders from buildProjectInClause; timeFilter is a static string
 	return query, args
 }
 

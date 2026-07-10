@@ -43,7 +43,7 @@ func SyncSprintIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 
 	inClause, args := buildProjectInClause(projectKeys)
 
-	query := fmt.Sprintf(`
+	const queryTmpl = `
 SELECT
     TRY_CAST(cf.NUMBERVALUE AS BIGINT) AS sprint_id,
     i.ID                               AS issue_id
@@ -52,7 +52,8 @@ JOIN JIRA_ISSUE_NON_PII i ON i.ID = cf.ISSUE
 WHERE cf.CUSTOMFIELD_NAME = 'Sprint'
   AND cf.NUMBERVALUE IS NOT NULL
   AND i.PROJECT IN %s
-`, inClause)
+`
+	query := fmt.Sprintf(queryTmpl, inClause) //nolint:gosec // G201: inClause contains only '?' placeholders from buildProjectInClause; no user data is interpolated
 
 	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {

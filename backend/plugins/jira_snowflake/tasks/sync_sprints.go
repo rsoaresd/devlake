@@ -47,7 +47,7 @@ func SyncSprints(subtaskCtx plugin.SubTaskContext) errors.Error {
 
 	// Select distinct sprints associated with issues in the board's projects.
 	// State is derived from STARTED/CLOSED booleans.
-	query := fmt.Sprintf(`
+	const queryTmpl = `
 SELECT DISTINCT
     sp.ID                                   AS sprint_id,
     sp.NAME                                 AS sprint_name,
@@ -66,7 +66,8 @@ JOIN JIRA_CUSTOMFIELDVALUE_NON_PII cf
     AND TRY_CAST(cf.NUMBERVALUE AS BIGINT) = sp.ID
 JOIN JIRA_ISSUE_NON_PII i ON i.ID = cf.ISSUE
 WHERE i.PROJECT IN %s
-`, inClause)
+`
+	query := fmt.Sprintf(queryTmpl, inClause) //nolint:gosec // G201: inClause contains only '?' placeholders from buildProjectInClause; no user data is interpolated
 
 	rows, goErr := data.SnowflakeDB.QueryContext(subtaskCtx.GetContext(), query, args...)
 	if goErr != nil {

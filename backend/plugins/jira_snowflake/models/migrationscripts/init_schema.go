@@ -20,8 +20,8 @@ package migrationscripts
 import (
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
-	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 )
 
 type initSchema struct{}
