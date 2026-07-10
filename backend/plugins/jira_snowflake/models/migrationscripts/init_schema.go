@@ -20,13 +20,31 @@ package migrationscripts
 import (
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/plugins/jira_snowflake/models"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/helpers/migrationhelper"
 )
 
 type initSchema struct{}
 
+// snowflakeJiraConnection20260708 is the schema snapshot at migration version 20260708000001.
+// AuthType was not yet present; it was added by the 20260709000001 migration.
+type snowflakeJiraConnection20260708 struct {
+	helper.BaseConnection `mapstructure:",squash"`
+	Account    string `gorm:"column:account;not null"`
+	User       string `gorm:"column:sf_user;not null"`
+	PrivateKey string `gorm:"column:private_key"`
+	Database   string `gorm:"column:sf_database;not null"`
+	Schema     string `gorm:"column:sf_schema;not null"`
+	Warehouse  string `gorm:"column:warehouse"`
+	Role       string `gorm:"column:sf_role"`
+}
+
+func (snowflakeJiraConnection20260708) TableName() string {
+	return "_tool_jira_snowflake_connections"
+}
+
 func (u *initSchema) Up(basicRes context.BasicRes) errors.Error {
-	return basicRes.GetDal().AutoMigrate(&models.SnowflakeJiraConnection{})
+	return migrationhelper.AutoMigrateTables(basicRes, &snowflakeJiraConnection20260708{})
 }
 
 func (u *initSchema) Version() uint64 {

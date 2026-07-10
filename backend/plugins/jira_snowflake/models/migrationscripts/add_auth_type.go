@@ -20,15 +20,34 @@ package migrationscripts
 import (
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
-	"github.com/apache/incubator-devlake/plugins/jira_snowflake/models"
+	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/helpers/migrationhelper"
 )
 
 // addAuthType adds the auth_type column and removes the NOT NULL constraint on
 // private_key so that externalbrowser connections don't require a key.
 type addAuthType struct{}
 
+// snowflakeJiraConnection20260709 is the schema snapshot at migration version 20260709000001.
+// Adds AuthType compared to the 20260708 snapshot.
+type snowflakeJiraConnection20260709 struct {
+	helper.BaseConnection `mapstructure:",squash"`
+	Account    string `gorm:"column:account;not null"`
+	User       string `gorm:"column:sf_user;not null"`
+	AuthType   string `gorm:"column:auth_type;default:keypair"`
+	PrivateKey string `gorm:"column:private_key"`
+	Database   string `gorm:"column:sf_database;not null"`
+	Schema     string `gorm:"column:sf_schema;not null"`
+	Warehouse  string `gorm:"column:warehouse"`
+	Role       string `gorm:"column:sf_role"`
+}
+
+func (snowflakeJiraConnection20260709) TableName() string {
+	return "_tool_jira_snowflake_connections"
+}
+
 func (u *addAuthType) Up(basicRes context.BasicRes) errors.Error {
-	return basicRes.GetDal().AutoMigrate(&models.SnowflakeJiraConnection{})
+	return migrationhelper.AutoMigrateTables(basicRes, &snowflakeJiraConnection20260709{})
 }
 
 func (u *addAuthType) Version() uint64 {
