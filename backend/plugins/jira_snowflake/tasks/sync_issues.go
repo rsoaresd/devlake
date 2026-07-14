@@ -210,6 +210,7 @@ SELECT
     s.PNAME                                                 AS status_name,
     CASE s.STATUSCATEGORY
         WHEN '2' THEN 'new'
+        WHEN '3' THEN 'indeterminate'
         WHEN '4' THEN 'done'
         ELSE          'indeterminate'
     END                                                     AS status_key,
