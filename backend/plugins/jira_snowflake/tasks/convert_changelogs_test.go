@@ -18,6 +18,7 @@ limitations under the License.
 package tasks
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
@@ -90,42 +91,12 @@ func TestConvertSprintIds_DifferentConnectionIds(t *testing.T) {
 	assert.NotEqual(t, r1, r2, "different connection IDs should produce different domain IDs")
 }
 
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
 func splitAndTrim(s, sep string) []string {
 	var result []string
-	for _, part := range splitStr(s, sep) {
-		part = trimStr(part)
-		if part != "" {
-			result = append(result, part)
+	for _, part := range strings.Split(s, sep) {
+		if p := strings.TrimSpace(part); p != "" {
+			result = append(result, p)
 		}
 	}
 	return result
-}
-
-func splitStr(s, sep string) []string {
-	if s == "" {
-		return nil
-	}
-	var parts []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if string(s[i]) == sep {
-			parts = append(parts, s[start:i])
-			start = i + 1
-		}
-	}
-	return append(parts, s[start:])
-}
-
-func trimStr(s string) string {
-	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t') {
-		s = s[1:]
-	}
-	for len(s) > 0 && (s[len(s)-1] == ' ' || s[len(s)-1] == '\t') {
-		s = s[:len(s)-1]
-	}
-	return s
 }
