@@ -53,10 +53,22 @@ tasks/convert_*.go        — domain-layer convertors (adapted copies of jira/ta
   `convert_issues.go` uses `_raw_data_params`-scoped deletion instead of the
   upstream `_raw_data_table`-based deletion.
 - **`StatusKey` mapping**: `JIRA_ISSUESTATUS_RHAI.STATUSCATEGORY` stores the Jira
-  status category as a **numeric string** (`'2'`=new/todo, `'3'`=in-progress, `'4'`=done).
-  The `CASE` expression in `sync_issues.go` maps these to DevLake standard keys.
+  status category as a **numeric string**. On `redhat.atlassian.net` the ids are
+  `'2'`=new/todo, `'3'`=done, `'4'`=in-progress (verified against
+  `/rest/api/3/status` — note this differs from older Atlassian docs that listed
+  3=indeterminate, 4=done). The `CASE` in `sync_issues.go` maps these to
+  DevLake keys (`new` / `done` / `indeterminate`).
 - **`StdType` / `StdStatus`**: populated in `sync_issues.go` using scope config
   type/status mappings (same logic as `issue_extractor.go` in the jira plugin).
+- **Scope config precedence** (in `PrepareTaskData`, same as the jira plugin):
+  1. Inline `options.scopeConfig`
+  2. Else `options.scopeConfigId`
+  3. Else `_tool_jira_boards.scope_config_id` for this connection + board
+  4. Else empty config (raw type names uppercased)
+  Scope configs live in shared `_tool_jira_scope_configs` — reuse a jira-plugin
+  config id when possible. For prod, set the board link once:
+  `UPDATE _tool_jira_boards SET scope_config_id = <id> WHERE connection_id = <sf> AND board_id = <board>;`
+  then blueprints only need `connectionId` / `boardId` / `projectKeys`.
 - **`TIMEWORKED` → `TimeSpentSeconds`**: stored as-is (seconds); the worklog
   convertor divides by 60 when writing `TimeSpentMinutes` to the domain layer.
 - **AuthType**: `"keypair"` (default, JWT) or `"externalbrowser"` (SSO, dev only).
@@ -67,7 +79,7 @@ tasks/convert_*.go        — domain-layer convertors (adapted copies of jira/ta
 | Table | Key columns | Notes |
 |---|---|---|
 | `JIRA_ISSUE_NON_PII` | `ID, ISSUE_KEY, PROJECT, ISSUETYPE, ISSUESTATUS_ID, SUMMARY, DESCRIPTION, PARENT_ID, TIMEORIGINALESTIMATE, TIMEESTIMATE, TIMESPENT, CREATED, UPDATED, RESOLUTIONDATE, DUEDATE, PRIORITY, COMPONENT, FIXFOR` | No `SUBTASK_FLAG`; use `JIRA_ISSUETYPE_RHAI.PSTYLE = 'subtask'` instead. `TIMEESTIMATE`, `DESCRIPTION`, `COMPONENT`, and `FIXFOR` can be NULL. `PRIORITY` stores a numeric Jira priority ID, not a human-readable name. |
-| `JIRA_ISSUESTATUS_RHAI` | `ID, PNAME, STATUSCATEGORY` | `STATUSCATEGORY` is a numeric string (`'2'`/`'3'`/`'4'`), not a text label. |
+| `JIRA_ISSUESTATUS_RHAI` | `ID, PNAME, STATUSCATEGORY` | `STATUSCATEGORY` is a numeric string (`'2'`=new, `'3'`=done, `'4'`=indeterminate on redhat.atlassian.net). |
 | `JIRA_ISSUETYPE_RHAI` | `ID, PNAME, PSTYLE` | `PSTYLE = 'subtask'` marks subtask types; can be NULL for normal types. |
 | `JIRA_PROJECT_RHAI` | `ID, PNAME, PKEY` | Join via `i.PROJECT = p.PKEY`. |
 | `JIRA_CUSTOMFIELDVALUE_NON_PII` | `ID, CUSTOMFIELD_NAME, ISSUE, NUMBERVALUE, STRINGVALUE` | `NUMBERVALUE` is `NUMBER(38,0)` — use `::FLOAT` / `::BIGINT` cast, not `TRY_CAST`. |

@@ -208,10 +208,12 @@ SELECT
     p.PNAME                                                 AS project_name,
     it.PNAME                                                AS issue_type,
     s.PNAME                                                 AS status_name,
+    -- redhat.atlassian.net statusCategory ids: 2=new, 3=done, 4=indeterminate
+    -- (differs from older Atlassian docs that listed 3=indeterminate, 4=done).
     CASE s.STATUSCATEGORY
         WHEN '2' THEN 'new'
-        WHEN '3' THEN 'indeterminate'
-        WHEN '4' THEN 'done'
+        WHEN '3' THEN 'done'
+        WHEN '4' THEN 'indeterminate'
         ELSE          'indeterminate'
     END                                                     AS status_key,
     i.SUMMARY,

@@ -125,19 +125,9 @@ func (p JiraSnowflake) PrepareTaskData(taskCtx plugin.TaskContext, options map[s
 		return nil, errors.Default.Wrap(err, "unable to get jira_snowflake connection")
 	}
 
-	// Resolve scope config from DB if only an ID was supplied
-	if op.ScopeConfig == nil && op.ScopeConfigId != 0 {
-		var scopeConfig jiramodels.JiraScopeConfig
-		if dbErr := taskCtx.GetDal().First(&scopeConfig, dal.Where("id = ?", op.ScopeConfigId)); dbErr != nil {
-			return nil, errors.BadInput.Wrap(dbErr, "failed to load scope config")
-		}
-		op.ScopeConfig = &scopeConfig
-	}
-	if op.ScopeConfig == nil {
-		op.ScopeConfig = new(jiramodels.JiraScopeConfig)
-	}
-
 	// Ensure a JiraBoard scope record exists so convertors can find it.
+	// Load the board before resolving scope config so we can inherit
+	// board.scope_config_id (same precedence as the jira plugin).
 	board := &jiramodels.JiraBoard{}
 	dbErr := taskCtx.GetDal().First(board, dal.Where("connection_id = ? AND board_id = ?", op.ConnectionId, op.BoardId))
 	if dbErr != nil && taskCtx.GetDal().IsErrorNotFound(dbErr) {
@@ -151,6 +141,22 @@ func (p JiraSnowflake) PrepareTaskData(taskCtx plugin.TaskContext, options map[s
 		}
 	} else if dbErr != nil {
 		return nil, errors.Default.Wrap(dbErr, "failed to look up JiraBoard scope record")
+	}
+
+	// Scope config precedence: inline options.scopeConfig > options.scopeConfigId >
+	// board.scope_config_id > empty config.
+	if op.ScopeConfigId == 0 && board.ScopeConfigId != 0 {
+		op.ScopeConfigId = board.ScopeConfigId
+	}
+	if op.ScopeConfig == nil && op.ScopeConfigId != 0 {
+		var scopeConfig jiramodels.JiraScopeConfig
+		if loadErr := taskCtx.GetDal().First(&scopeConfig, dal.Where("id = ?", op.ScopeConfigId)); loadErr != nil {
+			return nil, errors.BadInput.Wrap(loadErr, "failed to load scope config")
+		}
+		op.ScopeConfig = &scopeConfig
+	}
+	if op.ScopeConfig == nil {
+		op.ScopeConfig = new(jiramodels.JiraScopeConfig)
 	}
 
 	// Open the Snowflake SQL connection (closed in Close())

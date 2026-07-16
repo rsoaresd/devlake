@@ -71,9 +71,10 @@ func TestBuildIssuesQuery_ContainsRequiredColumns(t *testing.T) {
 
 func TestBuildIssuesQuery_StatusCategoryMapping(t *testing.T) {
 	q, _ := buildIssuesQuery([]string{"PROJ"}, nil)
-	// STATUSCATEGORY stores numeric IDs as strings: '2'=new, '3'=in_progress, '4'=done
+	// STATUSCATEGORY on redhat.atlassian.net: '2'=new, '3'=done, '4'=indeterminate
 	assert.Contains(t, q, "WHEN '2' THEN 'new'")
-	assert.Contains(t, q, "WHEN '4' THEN 'done'")
+	assert.Contains(t, q, "WHEN '3' THEN 'done'")
+	assert.Contains(t, q, "WHEN '4' THEN 'indeterminate'")
 	assert.Contains(t, q, "ELSE          'indeterminate'")
 	assert.Contains(t, q, "s.STATUSCATEGORY")
 }
