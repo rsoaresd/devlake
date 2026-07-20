@@ -70,6 +70,13 @@ identical semantics, eliminating the `golang.org/x/exp` import entirely.
 
 **Files:**
 - `backend/plugins/github/tasks/pr_convertor.go`
+- `backend/plugins/github/tasks/pr_comment_convertor.go`
+- `backend/plugins/github/tasks/pr_commit_convertor.go`
+- `backend/plugins/github/tasks/pr_issue_convertor.go`
+- `backend/plugins/github/tasks/pr_issue_enricher.go`
+- `backend/plugins/github/tasks/pr_label_convertor.go`
+- `backend/plugins/github/tasks/pr_review_convertor.go`
+- `backend/plugins/github/tasks/review_convertor.go`
 
 **Reason:** The convertor had no incremental filter. Filtering on `github_updated_at`
 (when GitHub last modified the PR) causes silent data loss: a PR merged during a long
