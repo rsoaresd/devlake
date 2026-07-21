@@ -79,6 +79,10 @@ func CleanupStaleBoardIssues(taskCtx plugin.SubTaskContext) errors.Error {
 	if err != nil {
 		return err
 	}
+	if onBoard == nil {
+		logger.Warn(nil, "board %d returned 404 from the board issues API, skipping stale cleanup to preserve existing associations", boardId)
+		return nil
+	}
 
 	removed := 0
 	for _, bi := range allBoardIssues {
@@ -93,23 +97,28 @@ func CleanupStaleBoardIssues(taskCtx plugin.SubTaskContext) errors.Error {
 			logger.Warn(updateErr, "failed to update issue state for %s, will still remove board association", bi.IssueKey)
 		}
 
-		// Remove from tool layer
-		if delErr := db.Delete(
-			&models.JiraBoardIssue{},
-			dal.Where("connection_id = ? AND board_id = ? AND issue_id = ?", connectionId, boardId, bi.IssueId),
-		); delErr != nil {
-			logger.Warn(delErr, "failed to remove stale tool board association for %s", bi.IssueKey)
-			continue
-		}
-
-		// Remove from domain layer so incremental converter runs also reflect the deletion
 		domainIssueId := issueIdGen.Generate(connectionId, bi.IssueId)
 		domainBoardId := boardIdGen.Generate(connectionId, boardId)
-		if delErr := db.Delete(
-			&ticket.BoardIssue{},
-			dal.Where("board_id = ? AND issue_id = ?", domainBoardId, domainIssueId),
-		); delErr != nil {
-			logger.Warn(delErr, "failed to remove stale domain board_issue for %s", bi.IssueKey)
+
+		tx := db.Begin()
+		txErr := tx.Delete(
+			&models.JiraBoardIssue{},
+			dal.Where("connection_id = ? AND board_id = ? AND issue_id = ?", connectionId, boardId, bi.IssueId),
+		)
+		if txErr == nil {
+			txErr = tx.Delete(
+				&ticket.BoardIssue{},
+				dal.Where("board_id = ? AND issue_id = ?", domainBoardId, domainIssueId),
+			)
+		}
+		if txErr != nil {
+			_ = tx.Rollback()
+			logger.Warn(txErr, "failed to remove stale association for %s, will retry next run", bi.IssueKey)
+			continue
+		}
+		if commitErr := tx.Commit(); commitErr != nil {
+			logger.Warn(commitErr, "failed to commit stale association removal for %s, will retry next run", bi.IssueKey)
+			continue
 		}
 
 		removed++
@@ -121,6 +130,7 @@ func CleanupStaleBoardIssues(taskCtx plugin.SubTaskContext) errors.Error {
 
 // fetchBoardMembership batch-checks which issue keys are still on the board using
 // issue IN (...) JQL — 100 issues per API call instead of one call per issue.
+// Returns (nil, nil) when the board is not found (404), signalling the caller to skip cleanup.
 func fetchBoardMembership(data *JiraTaskData, boardId uint64, issues []struct {
 	IssueKey string
 	IssueId  uint64
@@ -140,38 +150,53 @@ func fetchBoardMembership(data *JiraTaskData, boardId uint64, issues []struct {
 		}
 
 		path := fmt.Sprintf("agile/1.0/board/%d/issue", boardId)
-		query := url.Values{}
-		query.Set("jql", fmt.Sprintf("issue IN (%s)", strings.Join(keys, ",")))
-		query.Set("maxResults", fmt.Sprintf("%d", staleBoardIssueCheckBatchSize))
-		query.Set("fields", "id,key")
+		jql := fmt.Sprintf("issue IN (%s)", strings.Join(keys, ","))
 
-		resp, err := data.ApiClient.Get(path, query, nil)
-		if err != nil {
-			return nil, errors.Default.Wrap(err, "failed to batch-check board membership")
-		}
+		for startAt := 0; ; startAt += staleBoardIssueCheckBatchSize {
+			query := url.Values{}
+			query.Set("jql", jql)
+			query.Set("startAt", fmt.Sprintf("%d", startAt))
+			query.Set("maxResults", fmt.Sprintf("%d", staleBoardIssueCheckBatchSize))
+			query.Set("fields", "id,key")
 
-		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+			resp, err := data.ApiClient.Get(path, query, nil)
+			if err != nil {
+				return nil, errors.Default.Wrap(err, "failed to batch-check board membership")
+			}
+
+			if resp.StatusCode == http.StatusNotFound {
+				_ = resp.Body.Close()
+				return nil, nil
+			}
+
+			if resp.StatusCode != http.StatusOK {
+				_ = resp.Body.Close()
+				return nil, errors.Default.New(fmt.Sprintf("unexpected status %d from board issues API", resp.StatusCode))
+			}
+
+			blob, readErr := errors.Convert01(io.ReadAll(resp.Body))
 			_ = resp.Body.Close()
-			return nil, errors.Default.New(fmt.Sprintf("unexpected status %d from board issues API", resp.StatusCode))
-		}
+			if readErr != nil {
+				return nil, errors.Default.Wrap(readErr, "failed to read board response")
+			}
 
-		blob, readErr := errors.Convert01(io.ReadAll(resp.Body))
-		_ = resp.Body.Close()
-		if readErr != nil {
-			return nil, errors.Default.Wrap(readErr, "failed to read board response")
-		}
+			var result struct {
+				Total  int `json:"total"`
+				Issues []struct {
+					Key string `json:"key"`
+				} `json:"issues"`
+			}
+			if jsonErr := errors.Convert(json.Unmarshal(blob, &result)); jsonErr != nil {
+				return nil, errors.Default.Wrap(jsonErr, "failed to parse board response")
+			}
 
-		var result struct {
-			Issues []struct {
-				Key string `json:"key"`
-			} `json:"issues"`
-		}
-		if jsonErr := errors.Convert(json.Unmarshal(blob, &result)); jsonErr != nil {
-			return nil, errors.Default.Wrap(jsonErr, "failed to parse board response")
-		}
+			for _, issue := range result.Issues {
+				onBoard[issue.Key] = true
+			}
 
-		for _, issue := range result.Issues {
-			onBoard[issue.Key] = true
+			if startAt+len(result.Issues) >= result.Total {
+				break
+			}
 		}
 	}
 
